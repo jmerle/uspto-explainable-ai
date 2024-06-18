@@ -1,0 +1,15 @@
+{
+    "query": "((((((ti:polyunsaturated ti:omega) OR (cpc:C07C69/587 cpc:C07C57/03)) OR (cpc:A61K31/155 ti:omega)) OR (cpc:C07F9/106 cpc:C07F9/091)) OR (cpc:C07F9/106 cpc:A61K31/661))) NOT ((((((((((((ti:hastened ti:enhanced) XOR (cpc:C07C57/03 cpc:C07C59/64)) XOR (ti:transferase ti:farnesyl)) XOR (cpc:C07C59/42 cpc:A61K31/201)) XOR (cpc:C07C323/60 cpc:C07C59/64)) XOR (cpc:C07C323/52 cpc:C07C323/60)) XOR (cpc:C07C323/52 cpc:C07C69/63)) XOR (cpc:A61K31/23 cpc:A61K31/336)) XOR (cpc:C07C233/47 cpc:C07D277/34)) XOR (ti:alzheimer ti:nitric)) XOR (cpc:A61K31/165 cpc:A61K31/265)) XOR (cpc:C07C57/48 cpc:C07C57/42))",
+    "results": [
+        "US-2017327455-A1",
+        "US-2021238208-A1",
+        "US-2023140926-A1",
+        "US-9540307-B2",
+        "US-2010240616-A1",
+        "US-2015374660-A1",
+        "US-9512152-B2",
+        "US-9688613-B2",
+        "US-10723973-B2",
+        "US-9364465-B2"
+    ]
+}

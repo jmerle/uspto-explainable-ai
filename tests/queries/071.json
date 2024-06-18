@@ -1,0 +1,23 @@
+{
+    "query": "(((((cpc:B25H3/06 cpc:B25H3/04) OR (cpc:B25H3/04 cpc:A47F5/0807)) OR (cpc:A47B96/06 cpc:B25H3/04)) OR (cpc:A47F5/0815 cpc:A47F5/0823))) NOT (((((((((((((cpc:F16B45/00 cpc:A47B96/06) XOR (cpc:Y10T29/49998 cpc:F16B2/185)) XOR (cpc:B25H3/04 cpc:A47F5/0846)) XOR (cpc:A47B96/063 cpc:A47B95/00)) XOR (cpc:F16B45/00 cpc:A47B96/061)) XOR (cpc:A47B96/061 cpc:A47B96/027)) XOR (cpc:A47B96/1416 cpc:A47F5/0838)) XOR (ti:closet cpc:A47B45/00)) XOR (cpc:B25H3/04 cpc:B25H3/003)) XOR (cpc:A47B97/001 cpc:A47G1/162)) XOR (cpc:A47B96/06 cpc:A47B91/02)) XOR (cpc:F16B12/22 ti:easy)) XOR (cpc:A47B96/066 ti:shelf))",
+    "results": [
+        "US-7748544-B1",
+        "US-10188232-B2",
+        "US-10710234-B1",
+        "US-9452524-B1",
+        "US-2021237255-A1",
+        "US-2007012586-A1",
+        "US-2006102569-A1",
+        "US-7258239-B2",
+        "US-2022349520-A1",
+        "US-2005045573-A1",
+        "US-9936825-B1",
+        "US-2008169252-A1",
+        "US-10285515-B1",
+        "US-6964085-B2",
+        "US-6786340-B2",
+        "US-2022315081-A1",
+        "US-2010295430-A1",
+        "US-2004084342-A1"
+    ]
+}

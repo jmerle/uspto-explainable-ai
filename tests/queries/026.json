@@ -1,0 +1,25 @@
+{
+    "query": "(((cpc:A61K31/506 ti:pyridinyl) OR (ti:indolsulfonamides cpc:C07D401/12))) XOR (((((((((((((((ti:tryptophan ti:dioxygenase) XOR (ti:prostaglandin cpc:A61P15/06)) XOR (ti:bladder cpc:A61K31/7084)) XOR (ti:carbonyl cpc:A61K31/472)) XOR (ti:phenyl ti:cns)) XOR (cpc:C07D239/90 cpc:C07D239/91)) XOR (cpc:C07B59/002 ti:ibrutinib)) XOR (ti:serotonin cpc:C07D213/40)) XOR (ti:inos ti:pde)) XOR (ti:scaffolds cpc:C07D213/78)) XOR (cpc:C07D401/10 cpc:C07D213/26)) XOR (cpc:A61K31/506 ti:hypertrophic)) XOR (ti:peptidase ti:cannabinoid)) XOR (cpc:C07D347/00 cpc:G01N2800/50)) XOR (ti:imidazopyridine cpc:A61K31/496))",
+    "results": [
+        "US-2022259212-A1",
+        "US-2021205348-A1",
+        "US-8829002-B2",
+        "US-2021206749-A1",
+        "US-9777009-B2",
+        "US-2021214337-A1",
+        "US-2022081442-A1",
+        "US-11267824-B2",
+        "US-10472349-B2",
+        "US-2022087985-A1",
+        "US-2004087653-A1",
+        "US-2019144460-A1",
+        "US-9278953-B2",
+        "US-9738626-B2",
+        "US-9643928-B2",
+        "US-2015210669-A1",
+        "US-9125916-B2",
+        "US-2022298112-A1",
+        "US-8541428-B2",
+        "US-2009306037-A1"
+    ]
+}

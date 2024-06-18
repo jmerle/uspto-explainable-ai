@@ -1,0 +1,26 @@
+{
+    "query": "((((((((((((((ti:numerical cpc:G05B19/4067) OR (ti:numerical ti:nc)) OR (cpc:G05B19/402 cpc:G05B19/40937)) OR (cpc:G05B19/402 cpc:G05B19/425)) OR (ti:nc cpc:G05B19/409)) OR (cpc:G05B19/4067 cpc:G05B19/18)) OR (cpc:G05B2219/50102 ti:controller)) OR (cpc:G05B2219/32161 cpc:G05B19/40937)) OR (ti:operation cpc:G05B2219/34273)) OR (cpc:G05B2219/34273 ti:numerical)) OR (cpc:G05B2219/35172 ti:based)) OR (cpc:Y02P90/265 cpc:G05B19/18)) OR (cpc:G05B19/4097 cpc:G05B19/18))) NOT ((((cpc:G05B2219/34013 cpc:G05B19/4142) XOR (cpc:G05B19/41825 cpc:Y02P90/087)) XOR (cpc:G05B19/4068 cpc:G05B19/4155)) XOR (cpc:G05B2219/35293 cpc:G05B19/4155))",
+    "results": [
+        "US-10241501-B2",
+        "US-9471056-B2",
+        "US-10705489-B2",
+        "US-7239936-B2",
+        "US-10088824-B2",
+        "US-10162335-B2",
+        "US-9927799-B2",
+        "US-9310799-B2",
+        "US-9857787-B2",
+        "US-10139805-B2",
+        "US-9869994-B2",
+        "US-4839817-A",
+        "US-5608641-A",
+        "US-11215964-B2",
+        "US-9733637-B2",
+        "US-9494929-B2",
+        "US-10838405-B2",
+        "US-10108173-B2",
+        "US-9436365-B2",
+        "US-9904277-B2",
+        "US-10018992-B2"
+    ]
+}

@@ -1,0 +1,33 @@
+{
+    "query": "((((((((((cpc:C12N9/1247 cpc:C12P21/02) OR (cpc:C12N9/1247 cpc:C12P19/34)) OR (cpc:C12N9/1247 ti:rna)) OR (cpc:C12Y207/07006 cpc:C12P21/02)) OR (cpc:C12N9/1229 cpc:C12Y207/04001)) OR (cpc:C12N9/104 cpc:C12N15/70)) OR (ti:ribosomes cpc:C12N15/67)) OR (ti:ribosomes cpc:C12P21/02)) OR (ti:unnatural cpc:C12N15/70))) XOR ((((((((cpc:C40B50/06 cpc:C12P19/34) XOR (cpc:C12N15/63 cpc:C12Q2531/125)) XOR (cpc:C12N2310/3519 ti:crispr)) XOR (ti:natriegens ti:derived)) XOR (ti:lysates ti:co)) XOR (cpc:C12N9/1247 cpc:C12N15/63)) XOR (cpc:C07K14/245 cpc:C12N9/104)) XOR (cpc:C12N15/1096 cpc:C12N15/1072))",
+    "results": [
+        "US-2022243244-A1",
+        "US-2021024912-A1",
+        "US-9528137-B2",
+        "US-2023117150-A1",
+        "US-11673921-B2",
+        "US-10465221-B2",
+        "US-10017728-B2",
+        "US-2022389473-A1",
+        "US-2020270665-A1",
+        "US-9115380-B2",
+        "US-2018237756-A1",
+        "US-2022064688-A1",
+        "US-2020392550-A1",
+        "US-2022056425-A1",
+        "US-10590456-B2",
+        "US-2015376581-A1",
+        "US-11203773-B2",
+        "US-2011224106-A1",
+        "US-2021147894-A1",
+        "US-2023076421-A1",
+        "US-2022162659-A1",
+        "US-2022042019-A1",
+        "US-2017275665-A1",
+        "US-11136586-B2",
+        "US-11466279-B2",
+        "US-7186525-B2",
+        "US-11661398-B2",
+        "US-10350307-B2"
+    ]
+}

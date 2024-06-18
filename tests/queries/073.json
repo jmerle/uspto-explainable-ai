@@ -1,0 +1,11 @@
+{
+    "query": "((((ti:dimple cpc:A63B37/0007) OR (cpc:A63B37/0004 ti:dimple)) OR (cpc:A63B37/0006 cpc:A63B37/00065))) NOT ((((((((((((((cpc:F16H55/08 cpc:Y10T74/19972) XOR (cpc:F16H2049/003 cpc:F16H49/001)) XOR (cpc:F16J12/00 cpc:F17C13/00)) XOR (ti:meshing cpc:Y10T74/19)) XOR (cpc:A61F2230/0023 cpc:A61F2210/0014)) XOR (ti:near cpc:G02C2202/04)) XOR (cpc:B29C33/306 cpc:F03D1/0675)) XOR (cpc:H04R9/043 cpc:H04R2307/207)) XOR (ti:shrinking cpc:G02B7/022)) XOR (cpc:F21V11/02 ti:louver)) XOR (cpc:A61F9/0133 cpc:B26B9/00)) XOR (cpc:B29C33/42 cpc:B29D99/0053)) XOR (cpc:F16L33/03 cpc:Y10T24/1418)) XOR (cpc:B29D11/00 cpc:B29D11/00038))",
+    "results": [
+        "US-9943728-B2",
+        "US-9908005-B2",
+        "US-10343018-B2",
+        "US-2017080291-A1",
+        "US-9993690-B2",
+        "US-10335640-B2"
+    ]
+}

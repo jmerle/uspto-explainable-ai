@@ -1,0 +1,10 @@
+antlr4-tools
+conan
+mlxtend
+nbformat
+numpy
+pandas
+polars
+python-dotenv
+tqdm
+Whoosh

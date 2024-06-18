@@ -1,0 +1,13 @@
+{
+    "query": "((((cpc:G06F21/125 cpc:G06F21/14) OR (cpc:G06F21/14 ti:obfuscation)) OR (cpc:G06F2221/0748 cpc:G06F21/14))) NOT ((((((((((((((ti:vulnerabilities cpc:G06F11/3608) XOR (cpc:G06F21/54 ti:vulnerabilities)) XOR (cpc:G06F2221/033 cpc:G06F8/53)) XOR (cpc:G06F9/45516 cpc:G06F21/125)) XOR (cpc:G06F8/42 cpc:G06F8/41)) XOR (cpc:G06F11/3644 cpc:G06F11/3624)) XOR (ti:aspects cpc:G06F8/316)) XOR (cpc:G06F21/52 cpc:G06F9/4486)) XOR (ti:ofuscating ti:virtual)) XOR (cpc:G06F21/563 cpc:G06F21/14)) XOR (cpc:G06F8/427 cpc:G06F9/45504)) XOR (ti:interception cpc:G06F9/45504)) XOR (ti:illegal cpc:G06F21/52)) XOR (cpc:G06F21/14 ti:obfuscating))",
+    "results": [
+        "US-8589897-B2",
+        "US-8615735-B2",
+        "US-11256786-B2",
+        "US-7584364-B2",
+        "US-2019114401-A1",
+        "US-9639673-B2",
+        "US-9213826-B2",
+        "US-10255414-B2"
+    ]
+}

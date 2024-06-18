@@ -1,0 +1,12 @@
+{
+    "query": "(((((cpc:G06F3/04186 cpc:G06F3/041662) OR (cpc:G06F2203/04106 cpc:G06F3/041662)) OR (cpc:G06F2203/04108 ti:baseline)) OR (cpc:G06F3/04186 ti:baseline))) NOT (((((((((((((cpc:G06F2203/04108 cpc:G06F3/041662) XOR (cpc:G06F2203/04101 cpc:G06F3/041662)) XOR (ti:baseline cpc:G06F3/0447)) XOR (cpc:G06F18/24155 cpc:G06F2203/04101)) XOR (cpc:G06F3/04186 cpc:G06F3/04144)) XOR (cpc:G06F3/04144 cpc:G06F3/0447)) XOR (cpc:G06F3/0447 cpc:G06F3/041662)) XOR (cpc:G06F2203/04108 cpc:G06F3/041661)) XOR (ti:gestures ti:pre)) XOR (cpc:G06F3/0443 ti:transcapacitive)) XOR (ti:integer ti:non)) XOR (ti:palm cpc:G06F3/041661)) XOR (cpc:G01B2210/58 ti:interacting))",
+    "results": [
+        "US-10534484-B2",
+        "US-9746975-B2",
+        "US-2015116253-A1",
+        "US-10088942-B2",
+        "US-11294514-B2",
+        "US-2016283017-A1",
+        "US-9459729-B2"
+    ]
+}

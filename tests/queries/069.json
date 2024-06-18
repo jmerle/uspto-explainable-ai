@@ -1,0 +1,8 @@
+{
+    "query": "(((cpc:B60P3/0252 ti:rapidly) OR (ti:rapidly cpc:E04H3/28))) NOT (((((((((((((((cpc:F16M11/42 cpc:A45C5/04) XOR (cpc:G09F15/0068 cpc:G09F15/0062)) XOR (cpc:G09F9/3026 cpc:G09F19/22)) XOR (cpc:H04N5/64 cpc:A47B81/064)) XOR (cpc:G03B21/145 cpc:G03B21/54)) XOR (cpc:F16M11/42 cpc:G09F9/3026)) XOR (cpc:A47B81/064 cpc:F16M13/02)) XOR (cpc:G09F19/00 cpc:A47F5/108)) XOR (cpc:F16M11/42 cpc:G06F2200/1612)) XOR (cpc:G09F19/02 cpc:G06F2200/1612)) XOR (cpc:G09F27/00 cpc:H05K5/0004)) XOR (cpc:G09F21/042 cpc:G09F21/04)) XOR (cpc:G09F9/3026 cpc:H04N21/41415)) XOR (cpc:G09F27/00 cpc:H04N21/41415)) XOR (cpc:H04M1/0268 cpc:G09F9/375))",
+    "results": [
+        "US-2012272584-A1",
+        "US-2012272585-A1",
+        "US-8678941-B2"
+    ]
+}

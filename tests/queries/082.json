@@ -1,0 +1,28 @@
+{
+    "query": "(((((((((((((((((cpc:G06F16/447 cpc:G06F9/453) XOR (ti:amount ti:reductions)) XOR (ti:updated cpc:G06Q50/14)) XOR (ti:unified ti:invoked)) XOR (cpc:G06F17/303 ti:interdependent)) XOR (cpc:H04L41/0286 ti:outputting)) XOR (ti:orchestration cpc:G06F16/24534)) XOR (cpc:G06F8/70 ti:orchestrator)) XOR (ti:waterwheel cpc:G06F16/113)) XOR (cpc:G06Q10/063116 cpc:G06Q10/06314)) XOR (cpc:G06F11/324 cpc:G06F11/328)) XOR (cpc:G06F3/0213 cpc:G06F3/04892)) XOR (cpc:H04N21/42684 cpc:G09G5/005)) XOR (cpc:G06F11/3051 cpc:G06F11/328)) XOR (cpc:G06F17/30905 cpc:G06F17/30371)) XOR (cpc:H04L51/22 ti:delivered)) XOR (cpc:G06F11/2094 cpc:G06F17/30581))",
+    "results": [
+        "US-2015178404-A1",
+        "US-11138216-B2",
+        "US-11354141-B2",
+        "US-10757059-B2",
+        "US-2022405116-A1",
+        "US-11675486-B2",
+        "US-11062382-B2",
+        "US-2015347555-A1",
+        "US-2016147422-A1",
+        "US-2014304022-A1",
+        "US-11693906-B2",
+        "US-2020160254-A1",
+        "US-10866778-B2",
+        "US-2022404810-A1",
+        "US-9176727-B2",
+        "US-9665602-B1",
+        "US-2022374848-A1",
+        "US-2020167133-A1",
+        "US-10216556-B2",
+        "US-2021349899-A1",
+        "US-11277300-B2",
+        "US-2018357229-A1",
+        "US-2022383235-A1"
+    ]
+}

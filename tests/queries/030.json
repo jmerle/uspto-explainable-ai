@@ -1,0 +1,33 @@
+{
+    "query": "(((((((((cpc:E04C2/044 cpc:E04C2/382) OR (cpc:E04C2/044 cpc:E04C2/06)) OR (cpc:E04B1/41 cpc:E04C3/34)) OR (cpc:E04B1/41 ti:precast)) OR (ti:masonry cpc:B28B7/183)) OR (cpc:E02D2250/0023 cpc:E02D27/42)) OR (cpc:E04B2/26 cpc:E04C1/39)) OR (ti:masonry cpc:E04B2/24))) XOR (((((((((ti:post ti:leave) XOR (cpc:E04B5/046 cpc:E04C3/26)) XOR (cpc:E04B2/8652 cpc:E04B2/8635)) XOR (cpc:E01D21/00 cpc:E04G13/04)) XOR (cpc:E02D17/205 ti:compressibility)) XOR (cpc:E02D27/48 ti:foundation)) XOR (cpc:E02D27/48 ti:storied)) XOR (ti:pier cpc:E01D19/02)) XOR (ti:brick cpc:E04B2002/0254))",
+    "results": [
+        "US-11274412-B2",
+        "US-10815663-B1",
+        "US-5174085-A",
+        "US-10689853-B2",
+        "US-10655287-B2",
+        "US-4765104-A",
+        "US-2007144093-A1",
+        "US-10125487-B2",
+        "US-2002129453-A1",
+        "US-9410316-B2",
+        "US-2017254068-A1",
+        "US-10422133-B2",
+        "US-2015176276-A1",
+        "US-10344480-B2",
+        "US-7024831-B1",
+        "US-7661231-B2",
+        "US-6036906-A",
+        "US-2007094968-A1",
+        "US-9523194-B2",
+        "US-9422686-B2",
+        "US-2010325998-A1",
+        "US-2014223851-A1",
+        "US-2005262786-A1",
+        "US-9988775-B1",
+        "US-6503024-B2",
+        "US-2012167516-A1",
+        "US-8720160-B1",
+        "US-11293183-B2"
+    ]
+}

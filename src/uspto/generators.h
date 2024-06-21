@@ -162,15 +162,138 @@ public:
             return "";
         }
 
+        auto results = runFPGrowth(termGroups, searchIndex);
+
+        std::vector<std::pair<FPResult, ankerl::unordered_dense::set<std::string>>> groups;
+        int querySize = 0;
+
+        ankerl::unordered_dense::map<std::string, int> targetCoverage;
+        int uncoveredTargets = 50;
+
+        for (const auto& result : results) {
+            int newQuerySize = querySize + result.terms.size() + (querySize == 0 ? 0 : 1);
+            if (newQuerySize > 50) {
+                break;
+            }
+
+            ankerl::unordered_dense::set<std::string> coveredTargets;
+            bool coversOldTarget = false;
+
+            for (const auto& target : targets) {
+                bool covered = true;
+                const auto& targetTerms = termsByTarget[target];
+
+                for (const auto& term : result.terms) {
+                    if (!targetTerms.contains(term)) {
+                        covered = false;
+                        break;
+                    }
+                }
+
+                if (!covered) {
+                    continue;
+                }
+
+                coveredTargets.emplace(target);
+
+                if (targetCoverage[target] > 0) {
+                    coversOldTarget = true;
+                    break;
+                }
+            }
+
+            if (coversOldTarget) {
+                continue;
+            }
+
+            groups.emplace_back(result, coveredTargets);
+            for (const auto& target : coveredTargets) {
+                if (targetCoverage[target] == 0) {
+                    --uncoveredTargets;
+                }
+
+                ++targetCoverage[target];
+            }
+
+            querySize = newQuerySize;
+
+            if (uncoveredTargets == 0) {
+                break;
+            }
+        }
+
+        for (const auto& result : results) {
+            int newQuerySize = querySize + result.terms.size() + (querySize == 0 ? 0 : 1);
+            if (newQuerySize > 50) {
+                break;
+            }
+
+            ankerl::unordered_dense::set<std::string> coveredTargets;
+            for (const auto& target : targets) {
+                bool covered = true;
+                const auto& targetTerms = termsByTarget[target];
+
+                for (const auto& term : result.terms) {
+                    if (!targetTerms.contains(term)) {
+                        covered = false;
+                        break;
+                    }
+                }
+
+                if (covered) {
+                    coveredTargets.emplace(target);
+                }
+            }
+
+            groups.emplace_back(result, coveredTargets);
+            for (const auto& target : coveredTargets) {
+                ++targetCoverage[target];
+            }
+
+            querySize = newQuerySize;
+        }
+
+        std::vector<std::vector<std::string>> orGroups;
+        std::vector<std::vector<std::string>> xorGroups;
+
+        for (const auto& [result, coveredTargets] : groups) {
+            // The Whoosh query parser becomes a lot slower when there are many XOR operators
+            if (xorGroups.size() == 5) {
+                orGroups.emplace_back(result.terms);
+                continue;
+            }
+
+            bool exclusive = true;
+            for (const auto& target : coveredTargets) {
+                if (targetCoverage[target] != 1) {
+                    exclusive = false;
+                    break;
+                }
+            }
+
+            if (exclusive) {
+                xorGroups.emplace_back(result.terms);
+            } else {
+                orGroups.emplace_back(result.terms);
+            }
+        }
+
+        return serializeTermGroups(orGroups, xorGroups);
+    }
+
+private:
+    std::vector<FPResult> runFPGrowth(
+        const std::vector<std::vector<std::string>>& termGroups,
+        const SearchIndex& searchIndex) const {
         auto* ibase = ib_create(0, 0);
         auto* tabag = tbg_create(ibase);
 
-        for (const auto& terms : termGroups) {
-            for (const auto& term : terms) {
+        for (std::size_t i = 0; i < 50; ++i) {
+            for (const auto& term : termGroups[i]) {
                 ib_add2ta(ibase, term.c_str());
             }
 
-            ib_finta(ibase, 1);
+            ib_finta(ibase, 50 - i);
             tbg_add(tabag, nullptr);
 
             ib_clear(ibase);
@@ -212,81 +335,15 @@ public:
         fpg_mine(fpg, 0, 0);
         fpg_delete(fpg, 1);
 
-        std::vector<std::pair<FPResult, ankerl::unordered_dense::set<std::string>>> groups;
-        ankerl::unordered_dense::map<std::string, int> targetCoverage;
-        int querySize = 0;
-
+        std::vector<FPResult> results;
+        results.reserve(state.resultsSize);
         while (state.resultsSize > 0) {
-            auto result = mmheap::heap_remove_min(state.results.data(), state.resultsSize);
-
-            int newQuerySize = querySize + result.terms.size() + (querySize == 0 ? 0 : 1);
-            if (newQuerySize > 50) {
-                break;
-            }
-
-            ankerl::unordered_dense::set<std::string> coveredTargets;
-            bool coversNewTarget = false;
-
-            for (const auto& target : targets) {
-                bool covered = true;
-                const auto& targetTerms = termsByTarget[target];
-
-                for (const auto& term : result.terms) {
-                    if (!targetTerms.contains(term)) {
-                        covered = false;
-                        break;
-                    }
-                }
-
-                if (!covered) {
-                    continue;
-                }
-
-                coveredTargets.emplace(target);
-                coversNewTarget = coversNewTarget || targetCoverage[target] == 0;
-            }
-
-            if (!coversNewTarget) {
-                continue;
-            }
-
-            groups.emplace_back(result, coveredTargets);
-            for (const auto& target : coveredTargets) {
-                ++targetCoverage[target];
-            }
-
-            querySize = newQuerySize;
+            results.emplace_back(mmheap::heap_remove_min(state.results.data(), state.resultsSize));
         }
 
-        std::vector<std::vector<std::string>> orGroups;
-        std::vector<std::vector<std::string>> xorGroups;
-
-        for (const auto& [result, coveredTargets] : groups) {
-            // The Whoosh query parser becomes a lot slower when there are many XOR operators
-            if (xorGroups.size() == 5) {
-                orGroups.emplace_back(result.terms);
-                continue;
-            }
-
-            bool exclusive = true;
-            for (const auto& target : coveredTargets) {
-                if (targetCoverage[target] != 1) {
-                    exclusive = false;
-                    break;
-                }
-            }
-
-            if (exclusive) {
-                xorGroups.emplace_back(result.terms);
-            } else {
-                orGroups.emplace_back(result.terms);
-            }
-        }
-
-        return serializeTermGroups(orGroups, xorGroups);
+        return results;
     }
 
-private:
     std::string serializeTermGroups(
         const std::vector<std::vector<std::string>>& orGroups,
         const std::vector<std::vector<std::string>>& xorGroups) const {
@@ -346,10 +403,8 @@ inline std::vector<std::unique_ptr<QueryGenerator>> createQueryGenerators() {
              TermCategory::Title | TermCategory::Abstract,
              TermCategory::Cpc | TermCategory::Title | TermCategory::Abstract,
          }) {
-        out.emplace_back(std::make_unique<FPGrowthQueryGenerator>(categories, 2, 2, 2));
-
-        if ((categories & TermCategory::Abstract) == 0) {
-            out.emplace_back(std::make_unique<FPGrowthQueryGenerator>(categories, 2, 3, 3));
+        for (int minSupport = 4; minSupport <= 10; minSupport += 2) {
+            out.emplace_back(std::make_unique<FPGrowthQueryGenerator>(categories, minSupport, 2, 2));
         }
     }
 

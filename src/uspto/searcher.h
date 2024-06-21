@@ -29,7 +29,7 @@ class Searcher {
             : searcher(searcher) {}
 
         std::any visitTerm(whoosh::WhooshParser::TermContext* ctx) override {
-            return searcher.searchIndex.termBitsets.at(ctx->CATEGORY()->toString() + ":" + ctx->TOKEN()->toString());
+            return searcher.searchIndex.termBitsets.at(ctx->TOKEN(0)->toString() + ":" + ctx->TOKEN(1)->toString());
         }
 
         std::any visitTermExpr(whoosh::WhooshParser::TermExprContext* ctx) override {
@@ -71,7 +71,7 @@ class Searcher {
             : searcher(searcher) {}
 
         void enterTerm(whoosh::WhooshParser::TermContext* ctx) override {
-            auto term = ctx->CATEGORY()->toString() + ":" + ctx->TOKEN()->toString();
+            auto term = ctx->TOKEN(0)->toString() + ":" + ctx->TOKEN(1)->toString();
 
             double patentCount = searcher.searchIndex.ids.size();
             double termFrequency = searcher.searchIndex.termBitsets.at(term).cardinality();

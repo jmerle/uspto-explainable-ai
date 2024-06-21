@@ -25,6 +25,13 @@ struct SearchIndex {
     ankerl::unordered_dense::map<std::string, std::uint32_t> ids;
     ankerl::unordered_dense::map<std::string, roaring::Roaring> termBitsets;
     ankerl::unordered_dense::map<std::string, ankerl::unordered_dense::map<std::uint32_t, std::uint16_t>> termCounts;
+
+    double selectivity(const std::string& term) const {
+        double cardinality = termBitsets.at(term).cardinality();
+        double patentCount = ids.size();
+
+        return cardinality / patentCount;
+    }
 };
 
 inline ankerl::unordered_dense::set<std::string> getPublicationNumbers(

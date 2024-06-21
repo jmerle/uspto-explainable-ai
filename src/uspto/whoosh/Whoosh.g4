@@ -4,9 +4,8 @@ grammar Whoosh;
 
 WS: [ ]+ -> skip ;
 
-CATEGORY: 'cpc' | 'ti' | 'ab' | 'clm' | 'detd' ;
 TOKEN: [a-zA-Z0-9_./]+ ;
-term: CATEGORY ':' TOKEN ;
+term: TOKEN ':' TOKEN ;
 
 expr: term #termExpr
     | '(' expr ')' #wrappedExpr

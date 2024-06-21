@@ -60,21 +60,21 @@ void whooshParserInitialize() {
       "", "':'", "'('", "')'", "'OR'", "'AND'", "'XOR'", "'NOT'"
     },
     std::vector<std::string>{
-      "", "", "", "", "", "", "", "", "WS", "CATEGORY", "TOKEN"
+      "", "", "", "", "", "", "", "", "WS", "TOKEN"
     }
   );
   static const int32_t serializedATNSegment[] = {
-  	4,1,10,35,2,0,7,0,2,1,7,1,1,0,1,0,1,0,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  	4,1,9,35,2,0,7,0,2,1,7,1,1,0,1,0,1,0,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   	1,1,3,1,17,8,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,5,1,30,8,1,
   	10,1,12,1,33,9,1,1,1,0,1,2,2,0,2,0,0,38,0,4,1,0,0,0,2,16,1,0,0,0,4,5,
-  	5,9,0,0,5,6,5,1,0,0,6,7,5,10,0,0,7,1,1,0,0,0,8,9,6,1,-1,0,9,17,3,0,0,
-  	0,10,11,5,2,0,0,11,12,3,2,1,0,12,13,5,3,0,0,13,17,1,0,0,0,14,15,5,7,0,
-  	0,15,17,3,2,1,2,16,8,1,0,0,0,16,10,1,0,0,0,16,14,1,0,0,0,17,31,1,0,0,
-  	0,18,19,10,5,0,0,19,20,5,4,0,0,20,30,3,2,1,6,21,22,10,4,0,0,22,23,5,5,
-  	0,0,23,30,3,2,1,5,24,25,10,3,0,0,25,26,5,6,0,0,26,30,3,2,1,4,27,28,10,
-  	1,0,0,28,30,3,2,1,2,29,18,1,0,0,0,29,21,1,0,0,0,29,24,1,0,0,0,29,27,1,
-  	0,0,0,30,33,1,0,0,0,31,29,1,0,0,0,31,32,1,0,0,0,32,3,1,0,0,0,33,31,1,
-  	0,0,0,3,16,29,31
+  	5,9,0,0,5,6,5,1,0,0,6,7,5,9,0,0,7,1,1,0,0,0,8,9,6,1,-1,0,9,17,3,0,0,0,
+  	10,11,5,2,0,0,11,12,3,2,1,0,12,13,5,3,0,0,13,17,1,0,0,0,14,15,5,7,0,0,
+  	15,17,3,2,1,2,16,8,1,0,0,0,16,10,1,0,0,0,16,14,1,0,0,0,17,31,1,0,0,0,
+  	18,19,10,5,0,0,19,20,5,4,0,0,20,30,3,2,1,6,21,22,10,4,0,0,22,23,5,5,0,
+  	0,23,30,3,2,1,5,24,25,10,3,0,0,25,26,5,6,0,0,26,30,3,2,1,4,27,28,10,1,
+  	0,0,28,30,3,2,1,2,29,18,1,0,0,0,29,21,1,0,0,0,29,24,1,0,0,0,29,27,1,0,
+  	0,0,30,33,1,0,0,0,31,29,1,0,0,0,31,32,1,0,0,0,32,3,1,0,0,0,33,31,1,0,
+  	0,0,3,16,29,31
   };
   staticData->serializedATN = antlr4::atn::SerializedATNView(serializedATNSegment, sizeof(serializedATNSegment) / sizeof(serializedATNSegment[0]));
 
@@ -129,12 +129,12 @@ WhooshParser::TermContext::TermContext(ParserRuleContext *parent, size_t invokin
   : ParserRuleContext(parent, invokingState) {
 }
 
-tree::TerminalNode* WhooshParser::TermContext::CATEGORY() {
-  return getToken(WhooshParser::CATEGORY, 0);
+std::vector<tree::TerminalNode *> WhooshParser::TermContext::TOKEN() {
+  return getTokens(WhooshParser::TOKEN);
 }
 
-tree::TerminalNode* WhooshParser::TermContext::TOKEN() {
-  return getToken(WhooshParser::TOKEN, 0);
+tree::TerminalNode* WhooshParser::TermContext::TOKEN(size_t i) {
+  return getToken(WhooshParser::TOKEN, i);
 }
 
 
@@ -176,7 +176,7 @@ WhooshParser::TermContext* WhooshParser::term() {
   try {
     enterOuterAlt(_localctx, 1);
     setState(4);
-    match(WhooshParser::CATEGORY);
+    match(WhooshParser::TOKEN);
     setState(5);
     match(WhooshParser::T__0);
     setState(6);
@@ -398,7 +398,7 @@ WhooshParser::ExprContext* WhooshParser::expr(int precedence) {
     setState(16);
     _errHandler->sync(this);
     switch (_input->LA(1)) {
-      case WhooshParser::CATEGORY: {
+      case WhooshParser::TOKEN: {
         _localctx = _tracker.createInstance<TermExprContext>(_localctx);
         _ctx = _localctx;
         previousContext = _localctx;

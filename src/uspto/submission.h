@@ -69,7 +69,7 @@ private:
         double totalScore = 0.0;
         int found = 0;
 
-        for (std::size_t i = 0; i < targets.size(); ++i) {
+        for (std::size_t i = 0; i < 50; ++i) {
             if (results.contains(targets[i])) {
                 ++found;
             }
@@ -93,12 +93,16 @@ inline std::vector<Task> generateQueries(const std::filesystem::path& testDataFi
     Searcher searcher(searchIndex);
 
     std::vector<Task> tasks;
+    std::vector<std::string> targets;
 
     spdlog::info("Reading test data");
     readNeighbors(
         testDataFile,
         [&](const std::string& publicationNumber, const std::vector<std::string>& neighbors) {
             tasks.emplace_back(publicationNumber, neighbors);
+
+            targets.reserve(targets.size() + neighbors.size());
+            targets.insert(targets.end(), neighbors.begin(), neighbors.end());
         },
         maxRows);
 

@@ -14,7 +14,7 @@ class  WhooshParser : public antlr4::Parser {
 public:
   enum {
     T__0 = 1, T__1 = 2, T__2 = 3, T__3 = 4, T__4 = 5, T__5 = 6, T__6 = 7, 
-    WS = 8, CATEGORY = 9, TOKEN = 10
+    WS = 8, TOKEN = 9
   };
 
   enum {
@@ -45,8 +45,8 @@ public:
   public:
     TermContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *CATEGORY();
-    antlr4::tree::TerminalNode *TOKEN();
+    std::vector<antlr4::tree::TerminalNode *> TOKEN();
+    antlr4::tree::TerminalNode* TOKEN(size_t i);
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;

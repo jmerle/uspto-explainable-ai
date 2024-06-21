@@ -76,6 +76,9 @@ def generate_offline_notebook() -> None:
 
     add_code_cell(nb, "!rm -f /opt/conda/lib/libcurl*")
     add_code_cell(nb, "!cp -r /kaggle/input/uspto-explainable-ai-ensemble-dependencies/.conan2 /root/.conan2")
+    add_code_cell(nb, "!mkdir -p vendor")
+    add_code_cell(nb, "!cp -r /kaggle/input/christian-borgelt-fp-growth-6-21 vendor/borgelt")
+    add_code_cell(nb, "!cp -r /kaggle/input/jason-l-causey-min-max-heap vendor/min-max_heap")
     add_code_cell(nb, "!cmake . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=/kaggle/input/uspto-explainable-ai-ensemble-dependencies/build/Release/generators/conan_toolchain.cmake")
     add_code_cell(nb, "!make -j")
     add_code_cell(nb, "!./run-submission")

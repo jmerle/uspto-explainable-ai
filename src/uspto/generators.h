@@ -1,15 +1,22 @@
 #pragma once
 
+#include <limits>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <ankerl/unordered_dense.h>
 #include <fmt/format.h>
+#include <min-max_heap/mmheap.h>
 
 #include <uspto/index.h>
 #include <uspto/patents.h>
 #include <uspto/queries.h>
+
+extern "C" {
+#include <borgelt/fpgrowth/fpgrowth.h>
+}
 
 class QueryGenerator {
 public:
@@ -50,9 +57,7 @@ public:
         double bestScore = 0.0;
 
         for (const auto& [term, count] : counts) {
-            double score =
-                    static_cast<double>(count) / static_cast<double>(searchIndex.termBitsets.at(term).cardinality());
-
+            double score = static_cast<double>(count) / searchIndex.selectivity(term);
             if (score > bestScore) {
                 bestTerm = term;
                 bestScore = score;
@@ -63,31 +68,298 @@ public:
     }
 };
 
+class FPGrowthQueryGenerator : public QueryGenerator {
+    struct FPResult {
+        std::vector<std::string> terms;
+        int support = std::numeric_limits<int>::lowest();
+        double score = std::numeric_limits<double>::max();
+
+        FPResult() = default;
+
+        FPResult(const std::vector<std::string>& terms, int support, double score)
+            : terms(terms),
+              support(support),
+              score(score) {}
+
+        bool operator<(const FPResult& other) const {
+            if (score == other.score) {
+                return support > other.support;
+            }
+
+            return score < other.score;
+        }
+    };
+
+    struct FPState {
+        ITEMBASE* ibase;
+        const SearchIndex& searchIndex;
+
+        std::vector<FPResult> results;
+        std::size_t resultsSize;
+
+        FPState(ITEMBASE* ibase, const SearchIndex& searchIndex)
+            : ibase(ibase),
+              searchIndex(searchIndex),
+              results(1000),
+              resultsSize(0) {}
+
+        void report(const std::vector<std::string>& terms, int support) {
+            double selectivity = 1.0;
+            for (const auto& term : terms) {
+                selectivity *= searchIndex.selectivity(term);
+            }
+
+            double score = static_cast<double>(support) * selectivity;
+
+            FPResult result(terms, support, score);
+            mmheap::heap_insert_circular(result, results.data(), resultsSize, results.size());
+        }
+    };
+
+    TermCategory::TermCategory categories;
+    int minSupport;
+    int minGroupSize;
+    int maxGroupSize;
+
+public:
+    FPGrowthQueryGenerator(TermCategory::TermCategory categories, int minSupport, int minGroupSize, int maxGroupSize)
+        : categories(categories),
+          minSupport(minSupport),
+          minGroupSize(minGroupSize),
+          maxGroupSize(maxGroupSize) {}
+
+    std::string getName() const override {
+        return fmt::format(
+            "FPGrowthQueryGenerator(categories={}, minSupport={}, minGroupSize={}, maxGroupSize={})",
+            TermCategory::toString(categories),
+            minSupport,
+            minGroupSize,
+            maxGroupSize);
+    }
+
+    std::string generateQuery(
+        const std::vector<std::string>& targets,
+        PatentReader& patentReader,
+        const SearchIndex& searchIndex) const override {
+        std::vector<std::vector<std::string>> termGroups;
+        termGroups.reserve(targets.size());
+
+        ankerl::unordered_dense::map<std::string, ankerl::unordered_dense::set<std::string>> termsByTarget;
+        termsByTarget.reserve(targets.size());
+
+        bool hasTerms = false;
+
+        for (const auto& target : targets) {
+            auto terms = patentReader.readTerms(target, categories);
+
+            termGroups.emplace_back(terms);
+            termsByTarget.emplace(target, ankerl::unordered_dense::set<std::string>(terms.begin(), terms.end()));
+
+            hasTerms = hasTerms || !terms.empty();
+        }
+
+        if (!hasTerms) {
+            return "";
+        }
+
+        auto* ibase = ib_create(0, 0);
+        auto* tabag = tbg_create(ibase);
+
+        for (const auto& terms : termGroups) {
+            for (const auto& term : terms) {
+                ib_add2ta(ibase, term.c_str());
+            }
+
+            ib_finta(ibase, 1);
+            tbg_add(tabag, nullptr);
+
+            ib_clear(ibase);
+        }
+
+        auto* fpg = fpg_create(
+            FPG_FREQUENT,
+            minSupport,
+            100.0,
+            100.0,
+            minGroupSize,
+            maxGroupSize,
+            FPG_LDRATIO,
+            FPG_NONE,
+            1.0,
+            FPG_COMPLEX,
+            FPG_DEFAULT);
+
+        fpg_data(fpg, tabag, 0, 2);
+        auto* report = isr_create(ibase);
+
+        FPState state(ibase, searchIndex);
+        isr_setrepo(
+            report,
+            [](isreport* rep, void* data) {
+                auto* state = static_cast<FPState*>(data);
+
+                std::vector<std::string> terms;
+                terms.reserve(isr_cnt(rep));
+                for (int i = 0; i < isr_cnt(rep); ++i) {
+                    terms.emplace_back(ib_name(state->ibase, isr_itemx(rep, i)));
+                }
+
+                state->report(terms, isr_supp(rep));
+            },
+            &state);
+
+        fpg_report(fpg, report);
+        fpg_mine(fpg, 0, 0);
+        fpg_delete(fpg, 1);
+
+        std::vector<std::pair<FPResult, ankerl::unordered_dense::set<std::string>>> groups;
+        ankerl::unordered_dense::map<std::string, int> targetCoverage;
+        int querySize = 0;
+
+        while (state.resultsSize > 0) {
+            auto result = mmheap::heap_remove_min(state.results.data(), state.resultsSize);
+
+            int newQuerySize = querySize + result.terms.size() + (querySize == 0 ? 0 : 1);
+            if (newQuerySize > 50) {
+                break;
+            }
+
+            ankerl::unordered_dense::set<std::string> coveredTargets;
+            bool coversNewTarget = false;
+
+            for (const auto& target : targets) {
+                bool covered = true;
+                const auto& targetTerms = termsByTarget[target];
+
+                for (const auto& term : result.terms) {
+                    if (!targetTerms.contains(term)) {
+                        covered = false;
+                        break;
+                    }
+                }
+
+                if (!covered) {
+                    continue;
+                }
+
+                coveredTargets.emplace(target);
+                coversNewTarget = coversNewTarget || targetCoverage[target] == 0;
+            }
+
+            if (!coversNewTarget) {
+                continue;
+            }
+
+            groups.emplace_back(result, coveredTargets);
+            for (const auto& target : coveredTargets) {
+                ++targetCoverage[target];
+            }
+
+            querySize = newQuerySize;
+        }
+
+        std::vector<std::vector<std::string>> orGroups;
+        std::vector<std::vector<std::string>> xorGroups;
+
+        for (const auto& [result, coveredTargets] : groups) {
+            // The Whoosh query parser becomes a lot slower when there are many XOR operators
+            if (xorGroups.size() == 5) {
+                orGroups.emplace_back(result.terms);
+                continue;
+            }
+
+            bool exclusive = true;
+            for (const auto& target : coveredTargets) {
+                if (targetCoverage[target] != 1) {
+                    exclusive = false;
+                    break;
+                }
+            }
+
+            if (exclusive) {
+                xorGroups.emplace_back(result.terms);
+            } else {
+                orGroups.emplace_back(result.terms);
+            }
+        }
+
+        return serializeTermGroups(orGroups, xorGroups);
+    }
+
+private:
+    std::string serializeTermGroups(
+        const std::vector<std::vector<std::string>>& orGroups,
+        const std::vector<std::vector<std::string>>& xorGroups) const {
+        auto orQuery = joinTermGroups("OR", orGroups);
+        auto xorQuery = joinTermGroups("XOR", xorGroups);
+
+        if (!orGroups.empty() && !xorGroups.empty()) {
+            return fmt::format("({}) XOR {}", orQuery, xorQuery);
+        }
+
+        if (!orGroups.empty()) {
+            return orQuery;
+        }
+
+        if (!xorGroups.empty()) {
+            return xorQuery;
+        }
+
+        return "";
+    }
+
+    std::string joinTermGroups(const std::string& op, const std::vector<std::vector<std::string>>& groups) const {
+        if (groups.empty()) {
+            return "";
+        }
+
+        if (groups.size() == 1) {
+            return serializeTermGroup(groups[0]);
+        }
+
+        std::string out = fmt::format("({} {} {})", serializeTermGroup(groups[0]), op, serializeTermGroup(groups[1]));
+        for (std::size_t i = 2; i < groups.size(); ++i) {
+            out = fmt::format("({} {} {})", out, op, serializeTermGroup(groups[i]));
+        }
+
+        return out;
+    }
+
+    std::string serializeTermGroup(const std::vector<std::string>& group) const {
+        if (group.size() == 1) {
+            return group[0];
+        }
+
+        return fmt::format("({})", fmt::join(group, " "));
+    }
+};
+
 inline std::vector<std::unique_ptr<QueryGenerator>> createQueryGenerators() {
     std::vector<std::unique_ptr<QueryGenerator>> out;
 
-    std::vector<TermCategory::TermCategory> uniqueCategories{
-        TermCategory::Cpc,
-        TermCategory::Title,
-        TermCategory::Abstract,
-        TermCategory::Claims,
-        TermCategory::Description,
-    };
+    for (auto categories : std::vector<TermCategory::TermCategory>{
+             TermCategory::Cpc,
+             TermCategory::Title,
+             TermCategory::Abstract,
+             TermCategory::Cpc | TermCategory::Title,
+             TermCategory::Cpc | TermCategory::Abstract,
+             TermCategory::Title | TermCategory::Abstract,
+             TermCategory::Cpc | TermCategory::Title | TermCategory::Abstract,
+         }) {
+        out.emplace_back(std::make_unique<FPGrowthQueryGenerator>(categories, 2, 2, 2));
 
-    std::vector<TermCategory::TermCategory> combinedCategories{
-        TermCategory::Title | TermCategory::Abstract,
-        TermCategory::Title | TermCategory::Abstract | TermCategory::Claims,
-        TermCategory::Title | TermCategory::Abstract | TermCategory::Claims | TermCategory::Description,
-        TermCategory::Abstract | TermCategory::Claims | TermCategory::Description,
-        TermCategory::Claims | TermCategory::Description,
-        TermCategory::Cpc
-        | TermCategory::Title
-        | TermCategory::Abstract
-        | TermCategory::Claims
-        | TermCategory::Description,
-    };
+        if ((categories & TermCategory::Abstract) == 0) {
+            out.emplace_back(std::make_unique<FPGrowthQueryGenerator>(categories, 2, 3, 3));
+        }
+    }
 
-    for (const auto& category : uniqueCategories) {
+    for (auto category : std::vector<TermCategory::TermCategory>{
+             TermCategory::Cpc,
+             TermCategory::Title,
+             TermCategory::Abstract,
+             TermCategory::Claims,
+             TermCategory::Description,
+         }) {
         out.emplace_back(std::make_unique<SingleTermQueryGenerator>(category));
     }
 

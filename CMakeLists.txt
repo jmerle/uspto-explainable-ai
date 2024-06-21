@@ -2,7 +2,12 @@ cmake_minimum_required(VERSION 3.16)
 project(uspto-explainable-ai)
 
 set(CMAKE_CXX_STANDARD 17)
-add_definitions(-DANTLR4_USE_THREAD_LOCAL_CACHE=1)
+add_definitions(
+        -DANTLR4_USE_THREAD_LOCAL_CACHE=1
+        -DIDMAPFN
+        -DISR_PATSPEC
+        -DPSP_ESTIM
+        -DTA_SURR)
 
 find_package(antlr4-runtime CONFIG REQUIRED)
 find_package(bshoshany-thread-pool CONFIG REQUIRED)
@@ -16,10 +21,10 @@ find_package(roaring CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(unordered_dense CONFIG REQUIRED)
 
-file(GLOB_RECURSE common_sources src/*.cpp)
+file(GLOB_RECURSE common_sources src/*.cpp vendor/*.c)
 list(FILTER common_sources EXCLUDE REGEX "\/uspto\/tools\/")
 
-set(common_includes src)
+set(common_includes src vendor)
 set(common_libraries
         antlr4_static
         bshoshany-thread-pool::bshoshany-thread-pool

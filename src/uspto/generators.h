@@ -173,11 +173,11 @@ public:
         for (const auto& result : results) {
             int newQuerySize = querySize + result.terms.size() + (querySize == 0 ? 0 : 1);
             if (newQuerySize > 50) {
-                break;
+                continue;
             }
 
             ankerl::unordered_dense::set<std::string> coveredTargets;
-            bool coversOldTarget = false;
+            bool coversNewTarget = false;
 
             for (const auto& target : targets) {
                 bool covered = true;
@@ -195,14 +195,10 @@ public:
                 }
 
                 coveredTargets.emplace(target);
-
-                if (targetCoverage[target] > 0) {
-                    coversOldTarget = true;
-                    break;
-                }
+                coversNewTarget = coversNewTarget || targetCoverage[target] == 0;
             }
 
-            if (coversOldTarget) {
+            if (uncoveredTargets > 0 && !coversNewTarget) {
                 continue;
             }
 
@@ -212,41 +208,6 @@ public:
                     --uncoveredTargets;
                 }
 
-                ++targetCoverage[target];
-            }
-
-            querySize = newQuerySize;
-
-            if (uncoveredTargets == 0) {
-                break;
-            }
-        }
-
-        for (const auto& result : results) {
-            int newQuerySize = querySize + result.terms.size() + (querySize == 0 ? 0 : 1);
-            if (newQuerySize > 50) {
-                break;
-            }
-
-            ankerl::unordered_dense::set<std::string> coveredTargets;
-            for (const auto& target : targets) {
-                bool covered = true;
-                const auto& targetTerms = termsByTarget[target];
-
-                for (const auto& term : result.terms) {
-                    if (!targetTerms.contains(term)) {
-                        covered = false;
-                        break;
-                    }
-                }
-
-                if (covered) {
-                    coveredTargets.emplace(target);
-                }
-            }
-
-            groups.emplace_back(result, coveredTargets);
-            for (const auto& target : coveredTargets) {
                 ++targetCoverage[target];
             }
 
@@ -403,7 +364,7 @@ inline std::vector<std::unique_ptr<QueryGenerator>> createQueryGenerators() {
              TermCategory::Title | TermCategory::Abstract,
              TermCategory::Cpc | TermCategory::Title | TermCategory::Abstract,
          }) {
-        for (int minSupport = 4; minSupport <= 10; minSupport += 2) {
+        for (int minSupport = 2; minSupport <= 10; minSupport += 2) {
             out.emplace_back(std::make_unique<FPGrowthQueryGenerator>(categories, minSupport, 2, 2));
         }
     }

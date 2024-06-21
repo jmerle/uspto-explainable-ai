@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <mutex>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -52,36 +53,18 @@ inline ankerl::unordered_dense::set<std::string> getPublicationNumbers(
         return publicationNumbers;
     }
 
-    ankerl::unordered_dense::map<std::string, int> relevantNeighborCounts;
-
+    std::vector<std::string> allPublicationNumbers;
     spdlog::info("Reading nearest neighbors");
     readNeighbors(
         getCompetitionDataDirectory() / "nearest_neighbors.csv",
         [&](const std::string& publicationNumber, const std::vector<std::string>& neighbors) {
-            if (!publicationNumbers.contains(publicationNumber)) {
-                return;
-            }
-
-            for (const auto& neighbor : neighbors) {
-                ++relevantNeighborCounts[neighbor];
-            }
+            allPublicationNumbers.emplace_back(publicationNumber);
         });
 
-    std::vector<std::string> relevantNeighbors;
-    relevantNeighbors.reserve(relevantNeighborCounts.size());
-    for (const auto& [neighbor, _] : relevantNeighborCounts) {
-        relevantNeighbors.emplace_back(neighbor);
-    }
+    std::shuffle(allPublicationNumbers.begin(), allPublicationNumbers.end(), std::mt19937{std::random_device{}()});
 
-    std::sort(
-        relevantNeighbors.begin(),
-        relevantNeighbors.end(),
-        [&](const std::string& a, const std::string& b) {
-            return relevantNeighborCounts[a] > relevantNeighborCounts[b];
-        });
-
-    for (std::size_t i = 0; i < relevantNeighbors.size() && publicationNumbers.size() < 200'000; ++i) {
-        publicationNumbers.emplace(relevantNeighbors[i]);
+    for (std::size_t i = 0; i < allPublicationNumbers.size() && publicationNumbers.size() < 200'000; ++i) {
+        publicationNumbers.emplace(allPublicationNumbers[i]);
     }
 
     return publicationNumbers;

@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <filesystem>
 #include <mutex>
-#include <random>
 #include <string>
 #include <vector>
 
@@ -28,7 +27,7 @@ struct SearchIndex {
     ankerl::unordered_dense::map<std::string, ankerl::unordered_dense::map<std::uint32_t, std::uint16_t>> termCounts;
 
     double selectivity(const std::string& term) const {
-        double cardinality = termBitsets.at(term).cardinality();
+        double cardinality = termCounts.at(term).size();
         double patentCount = ids.size();
 
         return cardinality / patentCount;
@@ -53,18 +52,37 @@ inline ankerl::unordered_dense::set<std::string> getPublicationNumbers(
         return publicationNumbers;
     }
 
-    std::vector<std::string> allPublicationNumbers;
+    ankerl::unordered_dense::map<std::string, int> relevantNeighborCounts;
+
     spdlog::info("Reading nearest neighbors");
     readNeighbors(
         getCompetitionDataDirectory() / "nearest_neighbors.csv",
         [&](const std::string& publicationNumber, const std::vector<std::string>& neighbors) {
-            allPublicationNumbers.emplace_back(publicationNumber);
+            if (!publicationNumbers.contains(publicationNumber)) {
+                return;
+            }
+
+            for (const auto& neighbor : neighbors) {
+                ++relevantNeighborCounts[neighbor];
+            }
         });
 
-    std::shuffle(allPublicationNumbers.begin(), allPublicationNumbers.end(), std::mt19937{std::random_device{}()});
+    std::vector<std::string> relevantNeighbors;
+    relevantNeighbors.reserve(relevantNeighborCounts.size());
+    for (const auto& [neighbor, _] : relevantNeighborCounts) {
+        relevantNeighbors.emplace_back(neighbor);
+    }
 
-    for (std::size_t i = 0; i < allPublicationNumbers.size() && publicationNumbers.size() < 200'000; ++i) {
-        publicationNumbers.emplace(allPublicationNumbers[i]);
+    std::sort(
+        relevantNeighbors.begin(),
+        relevantNeighbors.end(),
+        [&](const std::string& a, const std::string& b) {
+            return relevantNeighborCounts[a] > relevantNeighborCounts[b];
+        });
+
+    std::size_t maxIndexSize = IS_KAGGLE ? 500'000 : 400'000;
+    for (std::size_t i = 0; i < relevantNeighbors.size() && publicationNumbers.size() < maxIndexSize; ++i) {
+        publicationNumbers.emplace(relevantNeighbors[i]);
     }
 
     return publicationNumbers;

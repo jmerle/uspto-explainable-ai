@@ -74,7 +74,7 @@ class Searcher {
             auto term = ctx->TOKEN(0)->toString() + ":" + ctx->TOKEN(1)->toString();
 
             double patentCount = searcher.searchIndex.ids.size();
-            double termFrequency = searcher.searchIndex.termBitsets.at(term).cardinality();
+            double termFrequency = searcher.searchIndex.termCounts.at(term).size();
             double idf = std::log(patentCount / (termFrequency + 1)) + 1;
 
             terms.emplace_back(term, idf);

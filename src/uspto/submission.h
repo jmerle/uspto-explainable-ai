@@ -123,8 +123,6 @@ inline std::vector<Task> generateQueries(const std::filesystem::path& testDataFi
         tasks.size(),
         [&](std::size_t start, std::size_t end) {
             PatentReader localPatentReader(patentReader);
-            std::vector<std::pair<std::string, std::string>> localOut;
-            double localTotalScore = 0.0;
 
             for (std::size_t i = start; i < end; ++i) {
                 Timer localTimer;
@@ -142,16 +140,14 @@ inline std::vector<Task> generateQueries(const std::filesystem::path& testDataFi
                     }
                 }
 
-                localTotalScore += task.bestScore;
+                std::lock_guard lock(mutex);
+                totalScore += task.bestScore;
+                ++tasksProcessed;
+
+                progressBar.setDescription(
+                    fmt::format("Processing tasks (mean score: {:.3f})", totalScore / tasksProcessed));
+                progressBar.update(1);
             }
-
-            std::lock_guard lock(mutex);
-            totalScore += localTotalScore;
-            tasksProcessed += end - start;
-
-            progressBar.setDescription(
-                fmt::format("Processing tasks (mean score: {:.3f})", totalScore / tasksProcessed));
-            progressBar.update(end - start);
         },
         threadPool.get_thread_count() * 5);
 
@@ -162,21 +158,21 @@ inline std::vector<Task> generateQueries(const std::filesystem::path& testDataFi
         ++queryGeneratorCounts[task.bestQueryGenerator];
     }
 
-    std::vector<std::pair<std::string, int>> queryGeneratroPairs;
-    queryGeneratroPairs.reserve(queryGeneratorCounts.size());
+    std::vector<std::pair<std::string, int>> queryGeneratorPairs;
+    queryGeneratorPairs.reserve(queryGeneratorCounts.size());
     for (const auto& [queryGenerator, count] : queryGeneratorCounts) {
-        queryGeneratroPairs.emplace_back(queryGenerator, count);
+        queryGeneratorPairs.emplace_back(queryGenerator, count);
     }
 
     std::sort(
-        queryGeneratroPairs.begin(),
-        queryGeneratroPairs.end(),
+        queryGeneratorPairs.begin(),
+        queryGeneratorPairs.end(),
         [](const std::pair<std::string, int>& a, const std::pair<std::string, int>& b) {
             return a.second > b.second;
         });
 
     spdlog::info("Best query generators:");
-    for (const auto& [queryGenerator, count] : queryGeneratroPairs) {
+    for (const auto& [queryGenerator, count] : queryGeneratorPairs) {
         spdlog::info("{}: {}", queryGenerator, count);
     }
 

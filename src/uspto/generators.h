@@ -104,11 +104,13 @@ class FPGrowthQueryGenerator : public QueryGenerator {
               resultsSize(0) {}
 
         void report(const std::vector<std::string>& terms, int support) {
-            double selectivity = 1.0;
-            for (const auto& term : terms) {
-                selectivity *= searchIndex.selectivity(term);
+            auto bitset = searchIndex.termBitsets.at(terms[0]);
+            for (std::size_t i = 1; i < terms.size(); ++i) {
+                bitset &= searchIndex.termBitsets.at(terms[i]);
             }
 
+            double selectivity =
+                    static_cast<double>(bitset.cardinality()) / static_cast<double>(searchIndex.ids.size());
             double score = static_cast<double>(support) * selectivity;
 
             FPResult result(terms, support, score);

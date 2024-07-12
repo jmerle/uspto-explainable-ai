@@ -9,6 +9,7 @@
 
 #include <ankerl/unordered_dense.h>
 #include <antlr4-runtime.h>
+#include <min-max_heap/mmheap.h>
 #include <roaring/roaring.hh>
 
 #include <uspto/index.h>
@@ -18,18 +19,18 @@
 #include <uspto/whoosh/WhooshVisitor.h>
 
 class Searcher {
-    const SearchIndex& searchIndex;
+    SearchIndex& searchIndex;
 
-    std::vector<std::string> patentIdsReversed;
+    const std::vector<std::string>& patentIdsReversed;
 
     struct MatchCollector : whoosh::WhooshVisitor {
-        const Searcher& searcher;
+        Searcher& searcher;
 
-        explicit MatchCollector(const Searcher& searcher)
+        explicit MatchCollector(Searcher& searcher)
             : searcher(searcher) {}
 
         std::any visitTerm(whoosh::WhooshParser::TermContext* ctx) override {
-            return searcher.searchIndex.termBitsets.at(ctx->TOKEN(0)->toString() + ":" + ctx->TOKEN(1)->toString());
+            return searcher.searchIndex.getTermBitset(ctx->TOKEN(0)->toString() + ":" + ctx->TOKEN(1)->toString());
         }
 
         std::any visitTermExpr(whoosh::WhooshParser::TermExprContext* ctx) override {
@@ -57,7 +58,7 @@ class Searcher {
 
         std::any visitNotExpr(whoosh::WhooshParser::NotExprContext* ctx) override {
             auto bits = std::any_cast<roaring::Roaring>(visit(ctx->right));
-            bits.flip(0, searcher.searchIndex.ids.size());
+            bits.flip(0, searcher.searchIndex.getPatentCount());
             return bits;
         }
     };
@@ -65,7 +66,7 @@ class Searcher {
     struct TermCollector : whoosh::WhooshBaseListener {
         const Searcher& searcher;
 
-        std::vector<std::pair<std::string, double>> terms;
+        ankerl::unordered_dense::map<std::string, double> terms;
 
         explicit TermCollector(const Searcher& searcher)
             : searcher(searcher) {}
@@ -73,24 +74,39 @@ class Searcher {
         void enterTerm(whoosh::WhooshParser::TermContext* ctx) override {
             auto term = ctx->TOKEN(0)->toString() + ":" + ctx->TOKEN(1)->toString();
 
-            double patentCount = searcher.searchIndex.ids.size();
-            double termFrequency = searcher.searchIndex.termCounts.at(term).size();
+            double patentCount = searcher.searchIndex.getPatentCount();
+            double termFrequency = searcher.searchIndex.getTermCardinality(term);
             double idf = std::log(patentCount / (termFrequency + 1)) + 1;
 
-            terms.emplace_back(term, idf);
+            terms[term] += idf;
+        }
+    };
+
+    struct SearchResult {
+        std::uint32_t patentId = std::numeric_limits<std::uint32_t>::max();
+        double tfIdf = std::numeric_limits<double>::lowest();
+
+        SearchResult() = default;
+
+        SearchResult(std::uint32_t patentId, double tfIdf)
+            : patentId(patentId),
+              tfIdf(tfIdf) {}
+
+        bool operator<(const SearchResult& other) const {
+            if (tfIdf == other.tfIdf) {
+                return patentId < other.patentId;
+            }
+
+            return tfIdf > other.tfIdf;
         }
     };
 
 public:
-    explicit Searcher(const SearchIndex& searchIndex)
-        : searchIndex(searchIndex) {
-        patentIdsReversed.resize(searchIndex.ids.size());
-        for (const auto& [publicationNumber, id] : searchIndex.ids) {
-            patentIdsReversed[id] = publicationNumber;
-        }
-    }
+    Searcher(SearchIndex& searchIndex, const std::vector<std::string>& patentIdsReversed)
+        : searchIndex(searchIndex),
+          patentIdsReversed(patentIdsReversed) {}
 
-    ankerl::unordered_dense::set<std::string> search(const std::string& query) const {
+    ankerl::unordered_dense::set<std::string> search(const std::string& query) {
         antlr4::ANTLRInputStream input(query);
         whoosh::WhooshLexer lexer(&input);
         antlr4::CommonTokenStream tokens(&lexer);
@@ -100,9 +116,15 @@ public:
 
         MatchCollector matchCollector(*this);
         auto bits = std::any_cast<roaring::Roaring>(matchCollector.visit(tree));
+        auto bitsCardinality = bits.cardinality();
+
+        // Queries with too many results are unlikely to be winners, and are expensive to sort
+        if (bitsCardinality > 5000) {
+            return {};
+        }
 
         std::vector<std::uint32_t> matchingPatentIds;
-        matchingPatentIds.reserve(bits.cardinality());
+        matchingPatentIds.reserve(bitsCardinality);
         for (auto id : bits) {
             matchingPatentIds.emplace_back(id);
         }
@@ -114,39 +136,32 @@ public:
         TermCollector termCollector(*this);
         antlr4::tree::ParseTreeWalker::DEFAULT.walk(&termCollector, tree);
 
-        ankerl::unordered_dense::map<std::uint32_t, double> tfIdf;
-        tfIdf.reserve(matchingPatentIds.size());
+        std::vector<SearchResult> results(50);
+        std::size_t resultsSize = 0;
 
         for (const auto& id : matchingPatentIds) {
-            double score = 0;
+            double tfIdf = 0;
 
             for (const auto& [term, idf] : termCollector.terms) {
-                const auto& counts = searchIndex.termCounts.at(term);
+                const auto& counts = searchIndex.getTermCounts(term);
 
                 auto countsIt = counts.find(id);
                 if (countsIt != counts.end()) {
-                    score += static_cast<double>(countsIt->second) * idf;
+                    tfIdf += static_cast<double>(countsIt->second) * idf;
                 }
             }
 
-            tfIdf.emplace(id, score);
+            SearchResult result(id, tfIdf);
+            mmheap::heap_insert_circular(result, results.data(), resultsSize, results.size());
         }
 
-        std::sort(
-            matchingPatentIds.begin(),
-            matchingPatentIds.end(),
-            [&](std::uint32_t a, std::uint32_t b) {
-                auto tfIdfA = tfIdf[a];
-                auto tfIdfB = tfIdf[b];
+        std::vector<std::uint32_t> sortedPatentIds;
+        sortedPatentIds.reserve(resultsSize);
+        while (resultsSize > 0) {
+            sortedPatentIds.emplace_back(mmheap::heap_remove_min(results.data(), resultsSize).patentId);
+        }
 
-                if (tfIdfA == tfIdfB) {
-                    return patentIdsReversed[a] < patentIdsReversed[b];
-                }
-
-                return tfIdfA > tfIdfB;
-            });
-
-        return idsToPublicationNumbers(matchingPatentIds);
+        return idsToPublicationNumbers(sortedPatentIds);
     }
 
 private:

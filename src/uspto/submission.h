@@ -46,8 +46,8 @@ struct Task {
     void tryGenerator(
         const std::unique_ptr<QueryGenerator>& queryGenerator,
         PatentReader& patentReader,
-        const SearchIndex& searchIndex,
-        const Searcher& searcher) {
+        SearchIndex& searchIndex,
+        Searcher& searcher) {
         auto query = queryGenerator->generateQuery(targets, patentReader, searchIndex);
         if (query.empty()) {
             return;
@@ -87,10 +87,11 @@ inline std::vector<Task> generateQueries(const std::filesystem::path& testDataFi
     spdlog::info("Creating patent reader");
     PatentReader patentReader;
 
-    spdlog::info("Creating search index");
-    auto searchIndex = getSearchIndex(patentReader, testDataFile, maxRows);
+    spdlog::info("Creating search index reader");
+    SearchIndexReader searchIndexReader(getFullIndexDirectory());
 
-    Searcher searcher(searchIndex);
+    spdlog::info("Reading reversed patent ids");
+    auto patentIdsReversed = searchIndexReader.readPatentIdsReversed();
 
     std::vector<Task> tasks;
     std::vector<std::string> targets;
@@ -124,6 +125,9 @@ inline std::vector<Task> generateQueries(const std::filesystem::path& testDataFi
         [&](std::size_t start, std::size_t end) {
             PatentReader localPatentReader(patentReader);
 
+            SearchIndex searchIndex(searchIndexReader);
+            Searcher searcher(searchIndex, patentIdsReversed);
+
             for (std::size_t i = start; i < end; ++i) {
                 Timer localTimer;
                 auto& task = tasks[i];
@@ -139,6 +143,8 @@ inline std::vector<Task> generateQueries(const std::filesystem::path& testDataFi
                         break;
                     }
                 }
+
+                searchIndex.clearCache();
 
                 std::lock_guard lock(mutex);
                 totalScore += task.bestScore;

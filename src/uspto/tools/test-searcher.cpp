@@ -12,7 +12,6 @@
 
 #include <uspto/config.h>
 #include <uspto/index.h>
-#include <uspto/patents.h>
 #include <uspto/searcher.h>
 
 double getMean(const std::vector<double>& values) {
@@ -34,17 +33,14 @@ double getMedian(const std::vector<double>& values) {
 }
 
 int main() {
-    spdlog::info("Creating patent reader");
-    PatentReader patentReader;
+    spdlog::info("Creating search index reader");
+    SearchIndexReader searchIndexReader(getValidationIndexDirectory());
 
-    spdlog::info("Creating search index");
-    auto searchIndex = getSearchIndex(
-        patentReader,
-        getValidationDataDirectory() / "neighbors_small.csv",
-        -1,
-        false);
+    spdlog::info("Reading reversed patent ids");
+    auto patentIdsReversed = searchIndexReader.readPatentIdsReversed();
 
-    Searcher searcher(searchIndex);
+    SearchIndex searchIndex(searchIndexReader);
+    Searcher searcher(searchIndex, patentIdsReversed);
 
     std::vector<std::filesystem::path> files;
     std::copy(

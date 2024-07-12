@@ -63,3 +63,20 @@ inline std::filesystem::path getReformattedPatentDataDirectory() {
 
     return getOutputDirectory() / "patents";
 }
+
+inline std::filesystem::path getValidationIndexDirectory() {
+    if (IS_KAGGLE) {
+        spdlog::error("getValidationIndexDirectory() is not supported when running on Kaggle");
+        std::exit(1);
+    }
+
+    return getOutputDirectory() / "validation-index";
+}
+
+inline std::filesystem::path getFullIndexDirectory() {
+    if (IS_KAGGLE) {
+        return "/kaggle/input/uspto-explainable-ai-full-search-index";
+    }
+
+    return getOutputDirectory() / "full-index";
+}

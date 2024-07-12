@@ -5,7 +5,8 @@ This repository contains my code for the [USPTO - Explainable AI for Patent Prof
 Kaggle links:
 - Offline notebook (competition submission): [USPTO Explainable AI - Ensemble](https://www.kaggle.com/code/jmerle/uspto-explainable-ai-ensemble)
 - Online notebook (dependencies): [USPTO Explainable AI - Ensemble dependencies](https://www.kaggle.com/code/jmerle/uspto-explainable-ai-ensemble-dependencies)
-- Dataset (reformatted competition data): [USPTO Explainable AI - Reformatted Patent Data](https://www.kaggle.com/datasets/jmerle/uspto-explainable-ai-reformatted-patent-data)
+- Reformatted competition data dataset: [USPTO Explainable AI - Reformatted Patent Data](https://www.kaggle.com/datasets/jmerle/uspto-explainable-ai-reformatted-patent-data)
+- Full search index dataset: [USPTO Explainable AI - Full Search Index](https://www.kaggle.com/datasets/jmerle/uspto-explainable-ai-full-search-index)
 - Original submission notebook (before switching to C++): [USPTO Explainable AI](https://www.kaggle.com/code/jmerle/uspto-explainable-ai)
 
 I started out in Python, and managed to get a public score of 0.53 using basic frequent pattern mining as seen in the [`python/original-submission.ipynb`](./python/original-submission.ipynb) notebook.
@@ -51,9 +52,11 @@ All executables must be executed with the following environment variables set:
 
 The following executables are available:
 - `reformat-patent-data`: extracts the patent data from the compressed Parquet files, tokenizes their contents, and stores the tokens to disk in `OUTPUT_DIRECTORY/patents`. Generates around 115GB of data in approximately 2 hours and 15 minutes on my personal laptop, a Lenovo Thinkpad T14 Gen 1 containing an AMD Ryzen 7 PRO 4750U CPU and 32GB of RAM.
+- `create-full-index`: creates a search index for the full dataset to `OUTPUT_DIRECTORY/full-index`.
+- `create-validation-index`: creates a search index for the validation dataset to `OUTPUT_DIRECTORY/validation-index`.
 - `run-submission`: generates queries for all rows in the `test.csv` file and saves the best query for each row to `submission.csv`. This code runs in submissions.
 - `tests`: runs the unit tests.
-- `test-searcher`: runs 103 queries with my custom searcher to test its accuracy and performance. These queries were first executed using Whoosh against Devin Anzelmo's validation index.
-- `test-submission`: simulates a submission on the first 2,500 rows in Devin Anzelmo's validation dataset's `neighbors_small.csv` file.
+- `test-searcher`: runs 103 queries with my custom searcher to test its accuracy and performance. These queries were first executed using Whoosh against Devin Anzelmo's validation index. Requires `create-validation-index` to be executed at least once before.
+- `test-submission`: simulates a submission on the first 2,500 rows in Devin Anzelmo's validation dataset's `neighbors_small.csv` file. Requires `create-full-index` to be executed at least once before.
 
 The submission notebooks are created by the [`python/generate_submission_notebook.py`](./python/generate_submission_notebooks.py) script.

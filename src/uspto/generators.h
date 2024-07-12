@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <limits>
 #include <memory>
 #include <string>
@@ -27,7 +28,7 @@ public:
     virtual std::string generateQuery(
         const std::vector<std::string>& targets,
         PatentReader& patentReader,
-        const SearchIndex& searchIndex) const = 0;
+        SearchIndex& searchIndex) const = 0;
 };
 
 class SingleTermQueryGenerator : public QueryGenerator {
@@ -44,7 +45,7 @@ public:
     std::string generateQuery(
         const std::vector<std::string>& targets,
         PatentReader& patentReader,
-        const SearchIndex& searchIndex) const override {
+        SearchIndex& searchIndex) const override {
         ankerl::unordered_dense::map<std::string, int> counts;
 
         for (const auto& target : targets) {
@@ -57,7 +58,7 @@ public:
         double bestScore = 0.0;
 
         for (const auto& [term, count] : counts) {
-            double score = static_cast<double>(count) / searchIndex.selectivity(term);
+            double score = static_cast<double>(count) / searchIndex.getTermSelectivity(term);
             if (score > bestScore) {
                 bestTerm = term;
                 bestScore = score;
@@ -92,25 +93,23 @@ class FPGrowthQueryGenerator : public QueryGenerator {
 
     struct FPState {
         ITEMBASE* ibase;
-        const SearchIndex& searchIndex;
+        SearchIndex& searchIndex;
 
         std::vector<FPResult> results;
         std::size_t resultsSize;
 
-        FPState(ITEMBASE* ibase, const SearchIndex& searchIndex)
+        FPState(ITEMBASE* ibase, SearchIndex& searchIndex)
             : ibase(ibase),
               searchIndex(searchIndex),
               results(1000),
               resultsSize(0) {}
 
         void report(const std::vector<std::string>& terms, int support) {
-            auto bitset = searchIndex.termBitsets.at(terms[0]);
+            double selectivity = searchIndex.getTermSelectivity(terms[0]);
             for (std::size_t i = 1; i < terms.size(); ++i) {
-                bitset &= searchIndex.termBitsets.at(terms[i]);
+                selectivity *= searchIndex.getTermSelectivity(terms[i]);
             }
 
-            double selectivity =
-                    static_cast<double>(bitset.cardinality()) / static_cast<double>(searchIndex.ids.size());
             double score = static_cast<double>(support) * selectivity;
 
             FPResult result(terms, support, score);
@@ -142,7 +141,7 @@ public:
     std::string generateQuery(
         const std::vector<std::string>& targets,
         PatentReader& patentReader,
-        const SearchIndex& searchIndex) const override {
+        SearchIndex& searchIndex) const override {
         std::vector<std::vector<std::string>> termGroups;
         termGroups.reserve(targets.size());
 
@@ -247,7 +246,7 @@ public:
 private:
     std::vector<FPResult> runFPGrowth(
         const std::vector<std::vector<std::string>>& termGroups,
-        const SearchIndex& searchIndex) const {
+        SearchIndex& searchIndex) const {
         auto* ibase = ib_create(0, 0);
         auto* tabag = tbg_create(ibase);
 
@@ -376,7 +375,6 @@ inline std::vector<std::unique_ptr<QueryGenerator>> createQueryGenerators() {
              TermCategory::Title,
              TermCategory::Abstract,
              TermCategory::Claims,
-             TermCategory::Description,
          }) {
         out.emplace_back(std::make_unique<SingleTermQueryGenerator>(category));
     }

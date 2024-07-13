@@ -1,8 +1,11 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <limits>
 #include <memory>
+#include <random>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -14,6 +17,8 @@
 #include <uspto/index.h>
 #include <uspto/patents.h>
 #include <uspto/queries.h>
+#include <uspto/searcher.h>
+#include <uspto/timer.h>
 
 extern "C" {
 #include <borgelt/fpgrowth/fpgrowth.h>
@@ -28,7 +33,77 @@ public:
     virtual std::string generateQuery(
         const std::vector<std::string>& targets,
         PatentReader& patentReader,
-        SearchIndex& searchIndex) const = 0;
+        SearchIndex& searchIndex,
+        Searcher& searcher) const = 0;
+
+    double getQueryScore(Searcher& searcher, const std::string& query, const std::vector<std::string>& targets) const {
+        if (query.empty()) {
+            return 0;
+        }
+
+        auto results = searcher.search(query);
+
+        // Adapted from https://www.kaggle.com/competitions/uspto-explainable-ai/discussion/499981#2791642
+        double totalScore = 0.0;
+        int found = 0;
+
+        for (std::size_t i = 0; i < targets.size(); ++i) {
+            if (results.contains(targets[i])) {
+                ++found;
+            }
+
+            totalScore += static_cast<double>(found) / static_cast<double>(i + 1);
+        }
+
+        return totalScore / static_cast<double>(targets.size());
+    }
+
+protected:
+    std::string serializeTermGroups(
+        const std::vector<std::vector<std::string>>& orGroups,
+        const std::vector<std::vector<std::string>>& xorGroups) const {
+        auto orQuery = joinTermGroups("OR", orGroups);
+        auto xorQuery = joinTermGroups("XOR", xorGroups);
+
+        if (!orGroups.empty() && !xorGroups.empty()) {
+            return fmt::format("({}) XOR {}", orQuery, xorQuery);
+        }
+
+        if (!orGroups.empty()) {
+            return orQuery;
+        }
+
+        if (!xorGroups.empty()) {
+            return xorQuery;
+        }
+
+        return "";
+    }
+
+    std::string joinTermGroups(const std::string& op, const std::vector<std::vector<std::string>>& groups) const {
+        if (groups.empty()) {
+            return "";
+        }
+
+        if (groups.size() == 1) {
+            return serializeTermGroup(groups[0]);
+        }
+
+        std::string out = fmt::format("({} {} {})", serializeTermGroup(groups[0]), op, serializeTermGroup(groups[1]));
+        for (std::size_t i = 2; i < groups.size(); ++i) {
+            out = fmt::format("({} {} {})", out, op, serializeTermGroup(groups[i]));
+        }
+
+        return out;
+    }
+
+    std::string serializeTermGroup(const std::vector<std::string>& group) const {
+        if (group.size() == 1) {
+            return group[0];
+        }
+
+        return fmt::format("({})", fmt::join(group, " "));
+    }
 };
 
 class SingleTermQueryGenerator : public QueryGenerator {
@@ -45,7 +120,8 @@ public:
     std::string generateQuery(
         const std::vector<std::string>& targets,
         PatentReader& patentReader,
-        SearchIndex& searchIndex) const override {
+        SearchIndex& searchIndex,
+        Searcher& searcher) const override {
         ankerl::unordered_dense::map<std::string, int> counts;
 
         for (const auto& target : targets) {
@@ -141,7 +217,8 @@ public:
     std::string generateQuery(
         const std::vector<std::string>& targets,
         PatentReader& patentReader,
-        SearchIndex& searchIndex) const override {
+        SearchIndex& searchIndex,
+        Searcher& searcher) const override {
         std::vector<std::vector<std::string>> termGroups;
         termGroups.reserve(targets.size());
 
@@ -305,56 +382,327 @@ private:
 
         return results;
     }
+};
 
-    std::string serializeTermGroups(
-        const std::vector<std::vector<std::string>>& orGroups,
-        const std::vector<std::vector<std::string>>& xorGroups) const {
-        auto orQuery = joinTermGroups("OR", orGroups);
-        auto xorQuery = joinTermGroups("XOR", xorGroups);
+class OptimizingQueryGenerator : public QueryGenerator {
+    TermCategory::TermCategory categories;
 
-        if (!orGroups.empty() && !xorGroups.empty()) {
-            return fmt::format("({}) XOR {}", orQuery, xorQuery);
+    struct Group {
+        std::size_t id;
+        std::vector<std::size_t> targets;
+        std::vector<std::pair<std::string, double>> availableTerms;
+
+        std::vector<std::string> selectedTerms;
+        double selectivity = 1.0;
+
+        Group(
+            std::size_t id,
+            const std::vector<std::size_t>& targets,
+            const std::vector<std::pair<std::string, double>>& availableTerms)
+            : id(id),
+              targets(targets),
+              availableTerms(availableTerms) {}
+    };
+
+    struct Action {
+        virtual ~Action() = default;
+
+        virtual void apply(std::vector<std::vector<std::size_t>>& targetGroups) = 0;
+    };
+
+    struct SplitToNewGroupAction : Action {
+        std::size_t groupIdx;
+        std::size_t targetIdx;
+
+        SplitToNewGroupAction(std::size_t groupIdx, std::size_t targetIdx)
+            : groupIdx(groupIdx),
+              targetIdx(targetIdx) {}
+
+        void apply(std::vector<std::vector<std::size_t>>& targetGroups) override {
+            targetGroups.emplace_back(std::vector<std::size_t>({targetGroups[groupIdx][targetIdx]}));
+            auto& group = targetGroups[groupIdx];
+            group.erase(group.begin() + targetIdx);
         }
+    };
 
-        if (!orGroups.empty()) {
-            return orQuery;
+    struct MoveToNewGroupAction : Action {
+        std::size_t groupIdx1;
+        std::size_t groupIdx2;
+        std::size_t targetIdx;
+
+        MoveToNewGroupAction(std::size_t groupIdx1, std::size_t groupIdx2, std::size_t targetIdx)
+            : groupIdx1(groupIdx1),
+              groupIdx2(groupIdx2),
+              targetIdx(targetIdx) {}
+
+        void apply(std::vector<std::vector<std::size_t>>& targetGroups) override {
+            auto& oldGroup = targetGroups[groupIdx1];
+            auto& newGroup = targetGroups[groupIdx2];
+
+            newGroup.emplace_back(oldGroup[targetIdx]);
+            oldGroup.erase(oldGroup.begin() + targetIdx);
         }
+    };
 
-        if (!xorGroups.empty()) {
-            return xorQuery;
+    struct MergeGroupsAction : Action {
+        std::size_t groupIdx1;
+        std::size_t groupIdx2;
+
+        MergeGroupsAction(std::size_t groupIdx1, std::size_t groupIdx2)
+            : groupIdx1(groupIdx1),
+              groupIdx2(groupIdx2) {}
+
+        void apply(std::vector<std::vector<std::size_t>>& targetGroups) override {
+            auto& group1 = targetGroups[groupIdx1];
+            const auto& group2 = targetGroups[groupIdx2];
+
+            group1.insert(group1.end(), group2.begin(), group2.end());
+            targetGroups.erase(targetGroups.begin() + groupIdx2);
         }
+    };
 
-        return "";
+public:
+    explicit OptimizingQueryGenerator(TermCategory::TermCategory categories)
+        : categories(categories) {}
+
+    std::string getName() const override {
+        return fmt::format("OptimizingQueryGenerator(categories={})", TermCategory::toString(categories));
     }
 
-    std::string joinTermGroups(const std::string& op, const std::vector<std::vector<std::string>>& groups) const {
-        if (groups.empty()) {
-            return "";
+    std::string generateQuery(
+        const std::vector<std::string>& targets,
+        PatentReader& patentReader,
+        SearchIndex& searchIndex,
+        Searcher& searcher) const override {
+        std::vector<std::set<std::string>> termsByTarget;
+        termsByTarget.reserve(targets.size());
+        for (const auto& target : targets) {
+            auto terms = patentReader.readTerms(target, categories);
+            termsByTarget.emplace_back(terms.begin(), terms.end());
         }
 
-        if (groups.size() == 1) {
-            return serializeTermGroup(groups[0]);
+        std::vector<std::vector<std::size_t>> targetGroups(1);
+        for (std::size_t i = 0; i < targets.size(); ++i) {
+            targetGroups[0].emplace_back(i);
         }
 
-        std::string out = fmt::format("({} {} {})", serializeTermGroup(groups[0]), op, serializeTermGroup(groups[1]));
-        for (std::size_t i = 2; i < groups.size(); ++i) {
-            out = fmt::format("({} {} {})", out, op, serializeTermGroup(groups[i]));
+        std::string bestQuery = createQuery(targetGroups, termsByTarget, searchIndex);
+        auto maxScore = getQueryScore(searcher, bestQuery, targets);
+
+        Timer timer;
+        while (timer.elapsedSeconds() < 20) {
+            bool foundImprovement = false;
+
+            for (const auto& action : getActions(targetGroups)) {
+                auto newTargetGroups = targetGroups;
+                action->apply(newTargetGroups);
+
+                auto query = createQuery(newTargetGroups, termsByTarget, searchIndex);
+                auto score = getQueryScore(searcher, query, targets);
+
+                if (score > maxScore) {
+                    bestQuery = query;
+                    maxScore = score;
+                    targetGroups = newTargetGroups;
+                    foundImprovement = true;
+                    break;
+                }
+            }
+
+            if (!foundImprovement) {
+                break;
+            }
         }
 
-        return out;
+        return bestQuery;
     }
 
-    std::string serializeTermGroup(const std::vector<std::string>& group) const {
-        if (group.size() == 1) {
-            return group[0];
+private:
+    std::vector<std::unique_ptr<Action>> getActions(const std::vector<std::vector<std::size_t>>& targetGroups) const {
+        std::vector<std::unique_ptr<Action>> actions;
+
+        for (std::size_t groupIdx1 = 0; groupIdx1 < targetGroups.size(); ++groupIdx1) {
+            for (std::size_t groupIdx2 = groupIdx1 + 1; groupIdx2 < targetGroups.size(); ++groupIdx2) {
+                actions.emplace_back(std::make_unique<MergeGroupsAction>(groupIdx1, groupIdx2));
+            }
+
+            const auto& group1 = targetGroups[groupIdx1];
+            if (group1.size() == 1) {
+                continue;
+            }
+
+            for (std::size_t targetIdx = 0; targetIdx < group1.size(); ++targetIdx) {
+                actions.emplace_back(std::make_unique<SplitToNewGroupAction>(groupIdx1, targetIdx));
+
+                for (std::size_t groupIdx2 = 0; groupIdx2 < targetGroups.size(); ++groupIdx2) {
+                    if (groupIdx1 != groupIdx2) {
+                        actions.emplace_back(
+                            std::make_unique<MoveToNewGroupAction>(groupIdx1, groupIdx2, targetIdx));
+                    }
+                }
+            }
         }
 
-        return fmt::format("({})", fmt::join(group, " "));
+        return actions;
+    }
+
+    std::string createQuery(
+        const std::vector<std::vector<std::size_t>>& targetGroups,
+        const std::vector<std::set<std::string>>& termsByTarget,
+        SearchIndex& searchIndex) const {
+        std::vector<Group> groups;
+        groups.reserve(targetGroups.size());
+
+        for (const auto& targetGroup : targetGroups) {
+            auto sharedTerms = termsByTarget[targetGroup[0]];
+
+            for (std::size_t i = 1; i < targetGroup.size(); ++i) {
+                const auto& targetTerms = termsByTarget[targetGroup[i]];
+
+                std::set<std::string> intersection;
+                std::set_intersection(
+                    sharedTerms.begin(),
+                    sharedTerms.end(),
+                    targetTerms.begin(),
+                    targetTerms.end(),
+                    std::inserter(intersection, intersection.begin()));
+
+                sharedTerms = intersection;
+            }
+
+            std::vector<std::pair<std::string, double>> availableTerms;
+
+            for (const auto& term : sharedTerms) {
+                double selectivity = searchIndex.getTermSelectivity(term);
+                if (selectivity < 0.01) {
+                    availableTerms.emplace_back(term, selectivity);
+                }
+            }
+
+            std::sort(
+                availableTerms.begin(),
+                availableTerms.end(),
+                [](const std::pair<std::string, double>& a, const std::pair<std::string, double>& b) {
+                    return a.second > b.second;
+                });
+
+            groups.emplace_back(groups.size(), targetGroup, availableTerms);
+        }
+
+        int tokensRemaining = 50;
+        while (tokensRemaining > 0) {
+            int bestGroup = -1;
+            std::size_t minTermCount = 100;
+            double maxSelectivity = -1;
+            int bestGroupRequiredTokens = -1;
+
+            for (int i = 0; i < groups.size(); ++i) {
+                const auto& group = groups[i];
+
+                int requiredTokens = 1;
+                if (tokensRemaining < 50 && group.selectedTerms.empty()) {
+                    requiredTokens = 2;
+                }
+
+                if (requiredTokens > tokensRemaining) {
+                    continue;
+                }
+
+                if (group.availableTerms.empty()) {
+                    continue;
+                }
+
+                std::size_t termCount = group.selectedTerms.size();
+                double selectivity = group.selectivity;
+
+                if (termCount < minTermCount || (termCount == minTermCount && selectivity > maxSelectivity)) {
+                    bestGroup = i;
+                    minTermCount = termCount;
+                    maxSelectivity = selectivity;
+                    bestGroupRequiredTokens = requiredTokens;
+                }
+            }
+
+            if (bestGroup == -1) {
+                break;
+            }
+
+            auto& group = groups[bestGroup];
+
+            const auto& newTerm = group.availableTerms.back();
+            group.selectedTerms.emplace_back(newTerm.first);
+            group.selectivity *= newTerm.second;
+
+            group.availableTerms.pop_back();
+            tokensRemaining -= bestGroupRequiredTokens;
+        }
+
+        std::sort(
+            groups.begin(),
+            groups.end(),
+            [](const Group& a, const Group& b) {
+                return a.selectivity > b.selectivity;
+            });
+
+        std::vector<std::vector<std::string>> orGroups;
+        std::vector<std::vector<std::string>> xorGroups;
+
+        for (const auto& group : groups) {
+            if (group.selectedTerms.empty()) {
+                continue;
+            }
+
+            // The Whoosh query parser becomes a lot slower when there are many XOR operators
+            if (xorGroups.size() == 5) {
+                orGroups.emplace_back(group.selectedTerms);
+                continue;
+            }
+
+            bool exclusive = true;
+            for (const auto& otherGroup : groups) {
+                if (group.id == otherGroup.id) {
+                    continue;
+                }
+
+                for (const auto& target : otherGroup.targets) {
+                    bool containsAll = true;
+
+                    const auto& targetTerms = termsByTarget[target];
+                    for (const auto& term : group.selectedTerms) {
+                        if (targetTerms.find(term) == targetTerms.end()) {
+                            containsAll = false;
+                            break;
+                        }
+                    }
+
+                    if (containsAll) {
+                        exclusive = false;
+                        break;
+                    }
+                }
+
+                if (!exclusive) {
+                    break;
+                }
+            }
+
+            if (exclusive) {
+                xorGroups.emplace_back(group.selectedTerms);
+            } else {
+                orGroups.emplace_back(group.selectedTerms);
+            }
+        }
+
+        return serializeTermGroups(orGroups, xorGroups);
     }
 };
 
 inline std::vector<std::unique_ptr<QueryGenerator>> createQueryGenerators() {
     std::vector<std::unique_ptr<QueryGenerator>> out;
+
+    out.emplace_back(
+        std::make_unique<OptimizingQueryGenerator>(
+            TermCategory::Cpc | TermCategory::Title | TermCategory::Abstract | TermCategory::Claims));
 
     for (auto categories : std::vector<TermCategory::TermCategory>{
              TermCategory::Cpc,
@@ -365,9 +713,7 @@ inline std::vector<std::unique_ptr<QueryGenerator>> createQueryGenerators() {
              TermCategory::Title | TermCategory::Abstract,
              TermCategory::Cpc | TermCategory::Title | TermCategory::Abstract,
          }) {
-        for (int minSupport = 2; minSupport <= 10; minSupport += 2) {
-            out.emplace_back(std::make_unique<FPGrowthQueryGenerator>(categories, minSupport, 2, 2));
-        }
+        out.emplace_back(std::make_unique<FPGrowthQueryGenerator>(categories, 2, 2, 2));
     }
 
     for (auto category : std::vector<TermCategory::TermCategory>{

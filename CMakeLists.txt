@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(uspto-explainable-ai)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 add_definitions(
         -DANTLR4_USE_THREAD_LOCAL_CACHE=1
         -DIDMAPFN
@@ -16,11 +16,16 @@ find_package(fast-cpp-csv-parser CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 find_package(indicators CONFIG REQUIRED)
-find_package(libpqxx CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(roaring CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(unordered_dense CONFIG REQUIRED)
+
+option(GRAFANA_ENABLED "Enable the Grafana integration" OFF)
+if (GRAFANA_ENABLED)
+    add_definitions(-DGRAFANA_ENABLED)
+    find_package(libpqxx CONFIG REQUIRED)
+endif ()
 
 file(GLOB_RECURSE common_sources src/*.cpp vendor/*.c)
 list(FILTER common_sources EXCLUDE REGEX "\/uspto\/tools\/")
@@ -32,10 +37,13 @@ set(common_libraries
         fast-cpp-csv-parser::fast-cpp-csv-parser
         fmt::fmt
         indicators::indicators
-        libpqxx::pqxx
         roaring::roaring
         spdlog::spdlog
         unordered_dense::unordered_dense)
+
+if (GRAFANA_ENABLED)
+    list(APPEND common_libraries libpqxx::pqxx)
+endif ()
 
 file(GLOB target_files src/uspto/tools/*.cpp)
 foreach (target_file ${target_files})

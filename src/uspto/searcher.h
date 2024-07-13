@@ -23,6 +23,8 @@ class Searcher {
 
     const std::vector<std::string>& patentIdsReversed;
 
+    ankerl::unordered_dense::map<std::string, ankerl::unordered_dense::set<std::string>> cache;
+
     struct MatchCollector : whoosh::WhooshVisitor {
         Searcher& searcher;
 
@@ -106,7 +108,16 @@ public:
         : searchIndex(searchIndex),
           patentIdsReversed(patentIdsReversed) {}
 
+    void clearCache() {
+        cache.clear();
+    }
+
     ankerl::unordered_dense::set<std::string> search(const std::string& query) {
+        auto cacheIt = cache.find(query);
+        if (cacheIt != cache.end()) {
+            return cacheIt->second;
+        }
+
         antlr4::ANTLRInputStream input(query);
         whoosh::WhooshLexer lexer(&input);
         antlr4::CommonTokenStream tokens(&lexer);
@@ -120,6 +131,7 @@ public:
 
         // Queries with too many results are unlikely to be winners, and are expensive to sort
         if (bitsCardinality > 5000) {
+            cache.emplace(query, ankerl::unordered_dense::set<std::string>());
             return {};
         }
 
@@ -130,7 +142,7 @@ public:
         }
 
         if (matchingPatentIds.size() <= 50) {
-            return idsToPublicationNumbers(matchingPatentIds);
+            return idsToPublicationNumbers(query, matchingPatentIds);
         }
 
         TermCollector termCollector(*this);
@@ -161,11 +173,13 @@ public:
             sortedPatentIds.emplace_back(mmheap::heap_remove_min(results.data(), resultsSize).patentId);
         }
 
-        return idsToPublicationNumbers(sortedPatentIds);
+        return idsToPublicationNumbers(query, sortedPatentIds);
     }
 
 private:
-    ankerl::unordered_dense::set<std::string> idsToPublicationNumbers(const std::vector<std::uint32_t>& ids) const {
+    ankerl::unordered_dense::set<std::string> idsToPublicationNumbers(
+        const std::string& query,
+        const std::vector<std::uint32_t>& ids) {
         std::size_t size = std::min(static_cast<std::size_t>(50), ids.size());
 
         ankerl::unordered_dense::set<std::string> out;
@@ -174,6 +188,7 @@ private:
             out.emplace(patentIdsReversed[ids[i]]);
         }
 
+        cache.emplace(query, out);
         return out;
     }
 };

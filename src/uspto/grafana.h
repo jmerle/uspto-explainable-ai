@@ -5,31 +5,20 @@
 #include <string>
 #include <vector>
 
-#include <pqxx/pqxx>
 #include <spdlog/spdlog.h>
 
 #include <uspto/config.h>
 #include <uspto/generators.h>
 
-class Reporter {
-public:
-    virtual ~Reporter() = default;
+#ifdef GRAFANA_ENABLED
 
-    virtual void init(
-        std::size_t threadCount,
-        std::size_t taskCount,
-        const std::vector<std::unique_ptr<QueryGenerator>>& generators) = 0;
+#include <pqxx/pqxx>
 
-    virtual void reportGenerator(std::size_t task, const std::string& generator, double score, double seconds) = 0;
-
-    virtual void reportTask(std::size_t task, const std::string& generator, double score, double seconds) = 0;
-};
-
-class PostgresReporter : public Reporter {
+class GrafanaReporter {
     pqxx::connection connection;
 
 public:
-    explicit PostgresReporter(bool initDatabase = false)
+    explicit GrafanaReporter(bool initDatabase = false)
         : connection("postgres://postgres:postgres@localhost:5432/postgres") {
         if (initDatabase) {
             pqxx::work work(connection);
@@ -81,7 +70,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     void init(
         std::size_t threadCount,
         std::size_t taskCount,
-        const std::vector<std::unique_ptr<QueryGenerator>>& generators) override {
+        const std::vector<std::unique_ptr<QueryGenerator>>& generators) {
         try {
             pqxx::work work(connection);
 
@@ -101,7 +90,7 @@ CREATE TABLE IF NOT EXISTS tasks (
         }
     }
 
-    void reportGenerator(std::size_t task, const std::string& generator, double score, double seconds) override {
+    void reportGenerator(std::size_t task, const std::string& generator, double score, double seconds) {
         try {
             pqxx::work work(connection);
             work.exec_prepared("update_generator", task, generator, score, seconds);
@@ -111,7 +100,7 @@ CREATE TABLE IF NOT EXISTS tasks (
         }
     }
 
-    void reportTask(std::size_t task, const std::string& generator, double score, double seconds) override {
+    void reportTask(std::size_t task, const std::string& generator, double score, double seconds) {
         try {
             pqxx::work work(connection);
             work.exec_prepared("update_task", task, generator, score, seconds);
@@ -122,22 +111,20 @@ CREATE TABLE IF NOT EXISTS tasks (
     }
 };
 
-class NullReporter : public Reporter {
+#else
+
+class GrafanaReporter {
 public:
+    explicit GrafanaReporter(bool initDatabase = false) {}
+
     void init(
         std::size_t threadCount,
         std::size_t taskCount,
-        const std::vector<std::unique_ptr<QueryGenerator>>& generators) override {}
+        const std::vector<std::unique_ptr<QueryGenerator>>& generators) {}
 
-    void reportGenerator(std::size_t task, const std::string& generator, double score, double seconds) override {}
+    void reportGenerator(std::size_t task, const std::string& generator, double score, double seconds) {}
 
-    void reportTask(std::size_t task, const std::string& generator, double score, double seconds) override {}
+    void reportTask(std::size_t task, const std::string& generator, double score, double seconds) {}
 };
 
-inline std::unique_ptr<Reporter> createReporter(bool initDatabase = false) {
-    if (isGrafanaEnabled()) {
-        return std::make_unique<PostgresReporter>(initDatabase);
-    }
-
-    return std::make_unique<NullReporter>();
-}
+#endif

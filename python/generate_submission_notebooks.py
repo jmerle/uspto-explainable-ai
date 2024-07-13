@@ -27,6 +27,7 @@ def generate_online_notebook() -> None:
     conanfile = remove_lines_with_prefix(conanfile, [
         "duckdb/",
         "gtest/",
+        "libpqxx/",
         "nlohmann_json/",
     ])
 

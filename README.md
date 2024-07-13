@@ -49,7 +49,6 @@ All executables must be executed with the following environment variables set wh
 - `VALIDATION_DATA_DIRECTORY`: path to the directory containing the data in the [USPTO-explainable-ai-validation-index](https://www.kaggle.com/datasets/devinanzelmo/uspto-explainable-ai-validation-index/data) dataset by Devin Anzelmo.
 - `PROJECT_DIRECTORY`: path to the directory containing this project.
 - `OUTPUT_DIRECTORY`: path to the directory where the executables write their data to.
-- `GRAFANA_ENABLED`: `true` if Grafana and PostgreSQL are running using the configuration in [`docker-compose.yml`](./docker-compose.yml).
 
 The following executables are available:
 - `reformat-patent-data`: extracts the patent data from the compressed Parquet files, tokenizes their contents, and stores the tokens to disk in `OUTPUT_DIRECTORY/patents`. Generates around 115GB of data in approximately 2 hours and 15 minutes on my personal laptop, a Lenovo Thinkpad T14 Gen 1 containing an AMD Ryzen 7 PRO 4750U CPU and 32GB of RAM.
@@ -64,7 +63,7 @@ The submission notebooks are created by the [`python/generate_submission_noteboo
 
 ## Grafana configuration
 
-When running the `run-submission` or `test-submission` executables with the `GRAFANA_ENABLED` environment variable set to `true`, the executable assumes you're running Grafana and PostgreSQL with the configuration in [`docker-compose.yml`](./docker-compose.yml).
+When building the `run-submission` or `test-submission` executables with the `GRAFANA_ENABLED` CMake option enabled, the executable assumes you're running Grafana and PostgreSQL with the configuration in [`docker-compose.yml`](./docker-compose.yml).
 
 The Grafana username and password are both "admin". After logging in for the first time, create a PostgreSQL data source using this configuration (leave the rest of the properties at their defaults):
 ![](grafana/data-source.png)

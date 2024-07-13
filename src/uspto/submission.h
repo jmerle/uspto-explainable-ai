@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <cstddef>
 #include <filesystem>
 #include <memory>
@@ -20,15 +19,7 @@
 #include <uspto/patents.h>
 #include <uspto/progress.h>
 #include <uspto/searcher.h>
-
-class Timer {
-    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-
-public:
-    double elapsedSeconds() const {
-        return std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - start).count();
-    }
-};
+#include <uspto/timer.h>
 
 struct Task {
     std::size_t id;
@@ -49,43 +40,19 @@ struct Task {
         PatentReader& patentReader,
         SearchIndex& searchIndex,
         Searcher& searcher,
-        const std::unique_ptr<Reporter>& reporter) {
+        GrafanaReporter& reporter) {
         Timer timer;
-        auto query = queryGenerator->generateQuery(targets, patentReader, searchIndex);
+        auto query = queryGenerator->generateQuery(targets, patentReader, searchIndex, searcher);
         double seconds = timer.elapsedSeconds();
 
-        if (query.empty()) {
-            reporter->reportGenerator(id, queryGenerator->getName(), 0.0, seconds);
-            return;
-        }
-
-        auto results = searcher.search(query);
-        double score = calculateScore(results);
-
-        reporter->reportGenerator(id, queryGenerator->getName(), score, seconds);
+        double score = queryGenerator->getQueryScore(searcher, query, targets);
+        reporter.reportGenerator(id, queryGenerator->getName(), score, seconds);
 
         if (score > bestScore) {
             bestScore = score;
             bestQuery = query;
             bestQueryGenerator = queryGenerator->getName();
         }
-    }
-
-private:
-    double calculateScore(const ankerl::unordered_dense::set<std::string>& results) const {
-        // Adapted from https://www.kaggle.com/competitions/uspto-explainable-ai/discussion/499981#2791642
-        double totalScore = 0.0;
-        int found = 0;
-
-        for (std::size_t i = 0; i < 50; ++i) {
-            if (results.contains(targets[i])) {
-                ++found;
-            }
-
-            totalScore += static_cast<double>(found) / static_cast<double>(i + 1);
-        }
-
-        return totalScore / 50.0;
     }
 };
 
@@ -122,8 +89,8 @@ inline std::vector<Task> generateQueries(const std::filesystem::path& testDataFi
     std::mutex mutex;
 
     spdlog::info("Initializing reporter");
-    auto initReporter = createReporter(true);
-    initReporter->init(threadPool.get_thread_count(), tasks.size(), queryGenerators);
+    GrafanaReporter initReporter(true);
+    initReporter.init(threadPool.get_thread_count(), tasks.size(), queryGenerators);
 
     spdlog::info("Finding best queries for {} test data rows", tasks.size());
     ProgressBar progressBar(tasks.size(), "Processing tasks");
@@ -140,7 +107,7 @@ inline std::vector<Task> generateQueries(const std::filesystem::path& testDataFi
             SearchIndex searchIndex(searchIndexReader);
             Searcher searcher(searchIndex, patentIdsReversed);
 
-            auto reporter = createReporter();
+            GrafanaReporter reporter;
 
             for (std::size_t i = start; i < end; ++i) {
                 Timer localTimer;
@@ -159,8 +126,9 @@ inline std::vector<Task> generateQueries(const std::filesystem::path& testDataFi
                     }
                 }
 
-                reporter->reportTask(task.id, task.bestQueryGenerator, task.bestScore, localTimer.elapsedSeconds());
+                reporter.reportTask(task.id, task.bestQueryGenerator, task.bestScore, localTimer.elapsedSeconds());
                 searchIndex.clearCache();
+                searcher.clearCache();
 
                 std::lock_guard lock(mutex);
                 totalScore += task.bestScore;

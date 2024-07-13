@@ -392,7 +392,6 @@
           "color": {
             "mode": "thresholds"
           },
-          "decimals": 1,
           "fieldMinMax": false,
           "mappings": [],
           "thresholds": {
@@ -404,7 +403,7 @@
               }
             ]
           },
-          "unit": "dtdurations"
+          "unit": "dthms"
         },
         "overrides": []
       },
@@ -430,7 +429,7 @@
         },
         "showPercentChange": false,
         "text": {
-          "valueSize": 30
+          "valueSize": 60
         },
         "textMode": "auto",
         "wideLayout": true
@@ -533,7 +532,7 @@
               }
             ]
           },
-          "unit": "dtdurations"
+          "unit": "dthms"
         },
         "overrides": []
       },
@@ -559,7 +558,7 @@
         },
         "showPercentChange": false,
         "text": {
-          "valueSize": 30
+          "valueSize": 60
         },
         "textMode": "auto",
         "wideLayout": true
@@ -1338,6 +1337,6 @@
   "timezone": "browser",
   "title": "Submission Monitoring",
   "uid": "cdrmq8hvx9hxcd",
-  "version": 15,
+  "version": 16,
   "weekStart": ""
 }

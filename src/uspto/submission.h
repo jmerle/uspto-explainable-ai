@@ -1,13 +1,11 @@
 #pragma once
 
-#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <filesystem>
 #include <memory>
 #include <mutex>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include <ankerl/unordered_dense.h>
@@ -17,6 +15,7 @@
 
 #include <uspto/csv.h>
 #include <uspto/generators.h>
+#include <uspto/grafana.h>
 #include <uspto/index.h>
 #include <uspto/patents.h>
 #include <uspto/progress.h>
@@ -32,6 +31,7 @@ public:
 };
 
 struct Task {
+    std::size_t id;
     std::string publicationNumber;
     std::vector<std::string> targets;
 
@@ -39,23 +39,31 @@ struct Task {
     double bestScore = 0.0;
     std::string bestQueryGenerator = "null";
 
-    Task(const std::string& publicationNumber, const std::vector<std::string>& targets)
-        : publicationNumber(publicationNumber),
+    Task(std::size_t id, const std::string& publicationNumber, const std::vector<std::string>& targets)
+        : id(id),
+          publicationNumber(publicationNumber),
           targets(targets) {}
 
     void tryGenerator(
         const std::unique_ptr<QueryGenerator>& queryGenerator,
         PatentReader& patentReader,
         SearchIndex& searchIndex,
-        Searcher& searcher) {
+        Searcher& searcher,
+        const std::unique_ptr<Reporter>& reporter) {
+        Timer timer;
         auto query = queryGenerator->generateQuery(targets, patentReader, searchIndex);
+        double seconds = timer.elapsedSeconds();
+
         if (query.empty()) {
+            reporter->reportGenerator(id, queryGenerator->getName(), 0.0, seconds);
             return;
         }
 
         auto results = searcher.search(query);
-
         double score = calculateScore(results);
+
+        reporter->reportGenerator(id, queryGenerator->getName(), score, seconds);
+
         if (score > bestScore) {
             bestScore = score;
             bestQuery = query;
@@ -100,7 +108,7 @@ inline std::vector<Task> generateQueries(const std::filesystem::path& testDataFi
     readNeighbors(
         testDataFile,
         [&](const std::string& publicationNumber, const std::vector<std::string>& neighbors) {
-            tasks.emplace_back(publicationNumber, neighbors);
+            tasks.emplace_back(tasks.size(), publicationNumber, neighbors);
 
             targets.reserve(targets.size() + neighbors.size());
             targets.insert(targets.end(), neighbors.begin(), neighbors.end());
@@ -110,11 +118,15 @@ inline std::vector<Task> generateQueries(const std::filesystem::path& testDataFi
     spdlog::info("Creating query generators");
     auto queryGenerators = createQueryGenerators();
 
-    spdlog::info("Finding best queries for {} test data rows", tasks.size());
-
-    ProgressBar progressBar(tasks.size(), "Processing tasks");
     BS::thread_pool threadPool;
     std::mutex mutex;
+
+    spdlog::info("Initializing reporter");
+    auto initReporter = createReporter(true);
+    initReporter->init(threadPool.get_thread_count(), tasks.size(), queryGenerators);
+
+    spdlog::info("Finding best queries for {} test data rows", tasks.size());
+    ProgressBar progressBar(tasks.size(), "Processing tasks");
 
     double totalScore = 0.0;
     double tasksProcessed = 0.0;
@@ -128,22 +140,26 @@ inline std::vector<Task> generateQueries(const std::filesystem::path& testDataFi
             SearchIndex searchIndex(searchIndexReader);
             Searcher searcher(searchIndex, patentIdsReversed);
 
+            auto reporter = createReporter();
+
             for (std::size_t i = start; i < end; ++i) {
                 Timer localTimer;
                 auto& task = tasks[i];
 
                 for (const auto& queryGenerator : queryGenerators) {
-                    task.tryGenerator(queryGenerator, localPatentReader, searchIndex, searcher);
+                    task.tryGenerator(queryGenerator, localPatentReader, searchIndex, searcher, reporter);
 
                     // The submission notebook may run for up to 9 hours
                     // It's ran in an environment with 4 CPUs and there are 2,500 tasks to process
                     // This means there are 51.84 seconds per task when nothing else has to happen
                     // Limiting to 40 seconds per task should prevent any timeouts
                     if (localTimer.elapsedSeconds() >= 40) {
+                        spdlog::warn("Task {} timed out after {}", task.id, queryGenerator->getName());
                         break;
                     }
                 }
 
+                reporter->reportTask(task.id, task.bestQueryGenerator, task.bestScore, localTimer.elapsedSeconds());
                 searchIndex.clearCache();
 
                 std::lock_guard lock(mutex);
@@ -158,29 +174,6 @@ inline std::vector<Task> generateQueries(const std::filesystem::path& testDataFi
         threadPool.get_thread_count() * 5);
 
     threadPool.wait();
-
-    ankerl::unordered_dense::map<std::string, int> queryGeneratorCounts;
-    for (const auto& task : tasks) {
-        ++queryGeneratorCounts[task.bestQueryGenerator];
-    }
-
-    std::vector<std::pair<std::string, int>> queryGeneratorPairs;
-    queryGeneratorPairs.reserve(queryGeneratorCounts.size());
-    for (const auto& [queryGenerator, count] : queryGeneratorCounts) {
-        queryGeneratorPairs.emplace_back(queryGenerator, count);
-    }
-
-    std::sort(
-        queryGeneratorPairs.begin(),
-        queryGeneratorPairs.end(),
-        [](const std::pair<std::string, int>& a, const std::pair<std::string, int>& b) {
-            return a.second > b.second;
-        });
-
-    spdlog::info("Best query generators:");
-    for (const auto& [queryGenerator, count] : queryGeneratorPairs) {
-        spdlog::info("{}: {}", queryGenerator, count);
-    }
 
     spdlog::info("Mean score: {:.3f}", totalScore / tasksProcessed);
     spdlog::info("Total time taken: {:.3f} seconds", globalTimer.elapsedSeconds());

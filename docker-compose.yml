@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:16.3
+    environment:
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - db:/var/lib/postgresql/data
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    environment:
+      - GF_DASHBOARDS_MIN_REFRESH_INTERVAL=1s
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana:/var/lib/grafana
+
+volumes:
+  db:
+  grafana:

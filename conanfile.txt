@@ -6,6 +6,7 @@ fast-cpp-csv-parser/cci.20240102
 fmt/10.2.1
 gtest/1.14.0
 indicators/2.3
+libpqxx/7.9.1
 nlohmann_json/3.11.3
 roaring/4.0.0
 spdlog/1.14.1

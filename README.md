@@ -44,11 +44,12 @@ $ cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=Release/generators/
 $ make -j
 ```
 
-All executables must be executed with the following environment variables set:
+All executables must be executed with the following environment variables set when running locally:
 - `COMPETITION_DATA_DIRECTORY`: path to the directory containing the competition data. For example, `COMPETITION_DATA_DIRECTORY/patent_metadata.parquet` and `COMPETITION_DATA_DIRECTORY/patent_data/2023_6.parquet` must be valid files.
 - `VALIDATION_DATA_DIRECTORY`: path to the directory containing the data in the [USPTO-explainable-ai-validation-index](https://www.kaggle.com/datasets/devinanzelmo/uspto-explainable-ai-validation-index/data) dataset by Devin Anzelmo.
 - `PROJECT_DIRECTORY`: path to the directory containing this project.
 - `OUTPUT_DIRECTORY`: path to the directory where the executables write their data to.
+- `GRAFANA_ENABLED`: `true` if Grafana and PostgreSQL are running using the configuration in [`docker-compose.yml`](./docker-compose.yml).
 
 The following executables are available:
 - `reformat-patent-data`: extracts the patent data from the compressed Parquet files, tokenizes their contents, and stores the tokens to disk in `OUTPUT_DIRECTORY/patents`. Generates around 115GB of data in approximately 2 hours and 15 minutes on my personal laptop, a Lenovo Thinkpad T14 Gen 1 containing an AMD Ryzen 7 PRO 4750U CPU and 32GB of RAM.
@@ -60,3 +61,13 @@ The following executables are available:
 - `test-submission`: simulates a submission on the first 2,500 rows in Devin Anzelmo's validation dataset's `neighbors_small.csv` file. Requires `create-full-index` to be executed at least once before.
 
 The submission notebooks are created by the [`python/generate_submission_notebook.py`](./python/generate_submission_notebooks.py) script.
+
+## Grafana configuration
+
+When running the `run-submission` or `test-submission` executables with the `GRAFANA_ENABLED` environment variable set to `true`, the executable assumes you're running Grafana and PostgreSQL with the configuration in [`docker-compose.yml`](./docker-compose.yml).
+
+The Grafana username and password are both "admin". After logging in for the first time, create a PostgreSQL data source using this configuration (leave the rest of the properties at their defaults):
+![](grafana/data-source.png)
+
+Then, go to Dashboards > New > Import and import the [grafana/submission-monitoring.json](./grafana/submission-monitoring.json) dashboard. With this configuration you'll see a dashboard like this while running the `run-submission` or `test-submission` executables locally:
+![](grafana/dashboard.png)

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(uspto-explainable-ai)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 add_definitions(
         -DANTLR4_USE_THREAD_LOCAL_CACHE=1
         -DIDMAPFN
@@ -16,6 +16,7 @@ find_package(fast-cpp-csv-parser CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 find_package(indicators CONFIG REQUIRED)
+find_package(libpqxx CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(roaring CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
@@ -31,6 +32,7 @@ set(common_libraries
         fast-cpp-csv-parser::fast-cpp-csv-parser
         fmt::fmt
         indicators::indicators
+        libpqxx::pqxx
         roaring::roaring
         spdlog::spdlog
         unordered_dense::unordered_dense)

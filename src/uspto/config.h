@@ -80,3 +80,11 @@ inline std::filesystem::path getFullIndexDirectory() {
 
     return getOutputDirectory() / "full-index";
 }
+
+inline bool isGrafanaEnabled() {
+    if (IS_KAGGLE) {
+        return false;
+    }
+
+    return getEnv("GRAFANA_ENABLED") == "true";
+}

@@ -852,30 +852,6 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "id"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 68
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "generator"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 1181
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
               "options": "ID"
             },
             "properties": [
@@ -894,6 +870,30 @@
               {
                 "id": "custom.width",
                 "value": 1174
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Score"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 3
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Time (s)"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 3
               }
             ]
           }
@@ -1077,6 +1077,7 @@
             "filterable": false,
             "inspect": false
           },
+          "decimals": 3,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -1201,6 +1202,7 @@
             "filterable": false,
             "inspect": false
           },
+          "decimals": 1,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -1337,6 +1339,6 @@
   "timezone": "browser",
   "title": "Submission Monitoring",
   "uid": "cdrmq8hvx9hxcd",
-  "version": 16,
+  "version": 17,
   "weekStart": ""
 }

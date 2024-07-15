@@ -124,11 +124,12 @@ inline std::vector<Task> generateQueries(const std::filesystem::path& testDataFi
                         spdlog::warn("Task {} timed out after {}", task.id, queryGenerator->getName());
                         break;
                     }
+
+                    searchIndex.clearCache();
+                    searcher.clearCache();
                 }
 
                 reporter.reportTask(task.id, task.bestQueryGenerator, task.bestScore, localTimer.elapsedSeconds());
-                searchIndex.clearCache();
-                searcher.clearCache();
 
                 std::lock_guard lock(mutex);
                 totalScore += task.bestScore;

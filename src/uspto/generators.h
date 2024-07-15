@@ -697,8 +697,204 @@ private:
     }
 };
 
+class BestEffortQueryGenerator : public QueryGenerator {
+    TermCategory::TermCategory categories;
+
+public:
+    explicit BestEffortQueryGenerator(TermCategory::TermCategory categories)
+        : categories(categories) {}
+
+    std::string getName() const override {
+        return fmt::format("BestEffortQueryGenerator(categories={})", TermCategory::toString(categories));
+    }
+
+    std::string generateQuery(
+        const std::vector<std::string>& targets,
+        PatentReader& patentReader,
+        SearchIndex& searchIndex,
+        Searcher& searcher) const override {
+        ankerl::unordered_dense::map<std::string, ankerl::unordered_dense::set<std::string>> termsByTarget;
+        termsByTarget.reserve(targets.size());
+
+        ankerl::unordered_dense::map<std::string, std::vector<std::string>> sortedTermsByTarget;
+        sortedTermsByTarget.reserve(targets.size());
+
+        for (const auto& target : targets) {
+            auto terms = patentReader.readTerms(target, categories);
+
+            std::sort(
+                terms.begin(),
+                terms.end(),
+                [&](const std::string& a, const std::string& b) {
+                    return searchIndex.getTermCardinality(a) < searchIndex.getTermCardinality(b);
+                });
+
+            termsByTarget.emplace(target, ankerl::unordered_dense::set<std::string>(terms.begin(), terms.end()));
+            sortedTermsByTarget.emplace(target, terms);
+        }
+
+        std::string bestQuery;
+        double maxScore = 0.0;
+
+        std::vector<ankerl::unordered_dense::set<std::string>> groups;
+        int remainingTokens = 50;
+
+        std::string previousTarget;
+        ankerl::unordered_dense::set<std::string> skippedTargets;
+
+        while (remainingTokens > 0) {
+            auto query = createQuery(groups, termsByTarget);
+
+            auto score = getQueryScore(searcher, query, targets);
+            if (score > maxScore) {
+                bestQuery = query;
+                maxScore = score;
+            }
+
+            std::string currentTarget;
+
+            if (!groups.empty() && groups.back().size() < 2) {
+                currentTarget = previousTarget;
+            } else {
+                auto results = !query.empty() ? searcher.search(query) : ankerl::unordered_dense::set<std::string>();
+                for (const auto& target : targets) {
+                    if (!skippedTargets.contains(target) && !results.contains(target)) {
+                        currentTarget = target;
+                        break;
+                    }
+                }
+            }
+
+            if (currentTarget.empty()) {
+                break;
+            }
+
+            int requiredTokens = 1;
+            if (!groups.empty() && currentTarget != previousTarget) {
+                ++requiredTokens;
+            }
+
+            if (requiredTokens > remainingTokens) {
+                break;
+            }
+
+            const auto& availableTerms = sortedTermsByTarget[currentTarget];
+            std::string bestTerm;
+
+            if (currentTarget != previousTarget) {
+                if (!availableTerms.empty()) {
+                    bestTerm = availableTerms[0];
+                }
+            } else {
+                const auto& currentGroup = groups.back();
+                std::vector<std::string> currentGroupVec(currentGroup.begin(), currentGroup.end());
+
+                auto bitset = searchIndex.getTermBitset(currentGroupVec[0]);
+                for (std::size_t i = 1; i < currentGroup.size(); ++i) {
+                    bitset &= searchIndex.getTermBitset(currentGroupVec[i]);
+                }
+
+                std::size_t minCardinality = std::numeric_limits<std::size_t>::max();
+
+                for (const auto& term : availableTerms) {
+                    if (currentGroup.contains(term)) {
+                        continue;
+                    }
+
+                    std::size_t cardinality = bitset.and_cardinality(searchIndex.getTermBitset(term));
+                    if (cardinality < minCardinality) {
+                        bestTerm = term;
+                        minCardinality = cardinality;
+                    }
+                }
+            }
+
+            if (bestTerm.empty()) {
+                skippedTargets.emplace(currentTarget);
+                continue;
+            }
+
+            if (currentTarget != previousTarget) {
+                groups.emplace_back();
+            }
+
+            groups.back().emplace(bestTerm);
+
+            remainingTokens -= requiredTokens;
+            previousTarget = currentTarget;
+        }
+
+        spdlog::info("{}: {}", maxScore, bestQuery);
+        return bestQuery;
+    }
+
+private:
+    std::string createQuery(
+        const std::vector<ankerl::unordered_dense::set<std::string>>& groups,
+        const ankerl::unordered_dense::map<
+            std::string,
+            ankerl::unordered_dense::set<std::string>>& termsByTarget) const {
+        std::vector<std::vector<std::string>> targetsByGroup;
+        ankerl::unordered_dense::map<std::string, std::size_t> groupsByTarget;
+
+        for (const auto& groupTerms : groups) {
+            std::vector<std::string> targets;
+
+            for (const auto& [target, targetTerms] : termsByTarget) {
+                bool matches = true;
+                for (const auto& term : groupTerms) {
+                    if (!targetTerms.contains(term)) {
+                        matches = false;
+                        break;
+                    }
+                }
+
+                if (matches) {
+                    targets.emplace_back(target);
+                    ++groupsByTarget[target];
+                }
+            }
+
+            targetsByGroup.emplace_back(targets);
+        }
+
+        std::vector<std::vector<std::string>> orGroups;
+        std::vector<std::vector<std::string>> xorGroups;
+
+        for (std::size_t i = 0; i < groups.size(); ++i) {
+            const auto& group = groups[i];
+
+            // The Whoosh query parser becomes a lot slower when there are many XOR operators
+            if (xorGroups.size() == 5) {
+                orGroups.emplace_back(group.begin(), group.end());
+                continue;
+            }
+
+            bool isExclusive = true;
+            for (const auto& target : targetsByGroup[i]) {
+                if (groupsByTarget[target] > 1) {
+                    isExclusive = false;
+                    break;
+                }
+            }
+
+            if (isExclusive) {
+                xorGroups.emplace_back(group.begin(), group.end());
+            } else {
+                orGroups.emplace_back(group.begin(), group.end());
+            }
+        }
+
+        return serializeTermGroups(orGroups, xorGroups);
+    }
+};
+
 inline std::vector<std::unique_ptr<QueryGenerator>> createQueryGenerators() {
     std::vector<std::unique_ptr<QueryGenerator>> out;
+
+    out.emplace_back(
+        std::make_unique<BestEffortQueryGenerator>(
+            TermCategory::Cpc | TermCategory::Title | TermCategory::Abstract | TermCategory::Claims));
 
     out.emplace_back(
         std::make_unique<OptimizingQueryGenerator>(

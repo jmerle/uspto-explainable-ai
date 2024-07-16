@@ -824,7 +824,6 @@ public:
             previousTarget = currentTarget;
         }
 
-        spdlog::info("{}: {}", maxScore, bestQuery);
         return bestQuery;
     }
 

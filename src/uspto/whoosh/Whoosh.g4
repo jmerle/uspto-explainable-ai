@@ -4,7 +4,7 @@ grammar Whoosh;
 
 WS: [ ]+ -> skip ;
 
-TOKEN: [a-zA-Z0-9_./]+ ;
+TOKEN: [a-zA-Z0-9_./*]+ ;
 term: TOKEN ':' TOKEN ;
 
 expr: term #termExpr

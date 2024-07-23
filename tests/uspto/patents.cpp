@@ -260,7 +260,4 @@ TEST(patents, writeAndReadPatentData) {
 
     auto titleTerms = reader.readTerms("US-1-A", TermCategory::Title);
     EXPECT_EQ(titleTerms, std::vector<std::string>({"ti:title"}));
-
-    auto titleCount = reader.readTermCount("US-1-A", "ti:title");
-    EXPECT_EQ(titleCount, 2);
 }

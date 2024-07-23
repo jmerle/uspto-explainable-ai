@@ -197,21 +197,29 @@ class FPGrowthQueryGenerator : public QueryGenerator {
     int minSupport;
     int minGroupSize;
     int maxGroupSize;
+    int maxXorGroups;
 
 public:
-    FPGrowthQueryGenerator(TermCategory::TermCategory categories, int minSupport, int minGroupSize, int maxGroupSize)
+    FPGrowthQueryGenerator(
+        TermCategory::TermCategory categories,
+        int minSupport,
+        int minGroupSize,
+        int maxGroupSize,
+        int maxXorGroups)
         : categories(categories),
           minSupport(minSupport),
           minGroupSize(minGroupSize),
-          maxGroupSize(maxGroupSize) {}
+          maxGroupSize(maxGroupSize),
+          maxXorGroups(maxXorGroups) {}
 
     std::string getName() const override {
         return fmt::format(
-            "FPGrowthQueryGenerator(categories={}, minSupport={}, minGroupSize={}, maxGroupSize={})",
+            "FPGrowthQueryGenerator(categories={}, minSupport={}, minGroupSize={}, maxGroupSize={}, maxXorGroups={})",
             TermCategory::toString(categories),
             minSupport,
             minGroupSize,
-            maxGroupSize);
+            maxGroupSize,
+            maxXorGroups);
     }
 
     std::string generateQuery(
@@ -297,7 +305,7 @@ public:
 
         for (const auto& [result, coveredTargets] : groups) {
             // The Whoosh query parser becomes a lot slower when there are many XOR operators
-            if (xorGroups.size() == 5) {
+            if (xorGroups.size() == maxXorGroups) {
                 orGroups.emplace_back(result.terms);
                 continue;
             }
@@ -386,6 +394,8 @@ private:
 
 class OptimizingQueryGenerator : public QueryGenerator {
     TermCategory::TermCategory categories;
+    double timeout;
+    int maxXorGroups;
 
     struct Group {
         std::size_t id;
@@ -462,11 +472,17 @@ class OptimizingQueryGenerator : public QueryGenerator {
     };
 
 public:
-    explicit OptimizingQueryGenerator(TermCategory::TermCategory categories)
-        : categories(categories) {}
+    OptimizingQueryGenerator(TermCategory::TermCategory categories, double timeout, int maxXorGroups)
+        : categories(categories),
+          timeout(timeout),
+          maxXorGroups(maxXorGroups) {}
 
     std::string getName() const override {
-        return fmt::format("OptimizingQueryGenerator(categories={})", TermCategory::toString(categories));
+        return fmt::format(
+            "OptimizingQueryGenerator(categories={}, timeout={}, maxXorGroups={})",
+            TermCategory::toString(categories),
+            timeout,
+            maxXorGroups);
     }
 
     std::string generateQuery(
@@ -490,7 +506,7 @@ public:
         auto maxScore = getQueryScore(searcher, bestQuery, targets);
 
         Timer timer;
-        while (timer.elapsedSeconds() < 20) {
+        while (timer.elapsedSeconds() < timeout) {
             bool foundImprovement = false;
 
             for (const auto& action : getActions(targetGroups)) {
@@ -653,7 +669,7 @@ private:
             }
 
             // The Whoosh query parser becomes a lot slower when there are many XOR operators
-            if (xorGroups.size() == 5) {
+            if (xorGroups.size() == maxXorGroups) {
                 orGroups.emplace_back(group.selectedTerms);
                 continue;
             }
@@ -699,13 +715,18 @@ private:
 
 class BestEffortQueryGenerator : public QueryGenerator {
     TermCategory::TermCategory categories;
+    int maxXorGroups;
 
 public:
-    explicit BestEffortQueryGenerator(TermCategory::TermCategory categories)
-        : categories(categories) {}
+    BestEffortQueryGenerator(TermCategory::TermCategory categories, int maxXorGroups)
+        : categories(categories),
+          maxXorGroups(maxXorGroups) {}
 
     std::string getName() const override {
-        return fmt::format("BestEffortQueryGenerator(categories={})", TermCategory::toString(categories));
+        return fmt::format(
+            "BestEffortQueryGenerator(categories={}, maxXorGroups={})",
+            TermCategory::toString(categories),
+            maxXorGroups);
     }
 
     std::string generateQuery(
@@ -864,7 +885,7 @@ private:
             const auto& group = groups[i];
 
             // The Whoosh query parser becomes a lot slower when there are many XOR operators
-            if (xorGroups.size() == 5) {
+            if (xorGroups.size() == maxXorGroups) {
                 orGroups.emplace_back(group.begin(), group.end());
                 continue;
             }
@@ -891,13 +912,24 @@ private:
 inline std::vector<std::unique_ptr<QueryGenerator>> createQueryGenerators() {
     std::vector<std::unique_ptr<QueryGenerator>> out;
 
+    int maxXorGroups = 7;
+
     out.emplace_back(
         std::make_unique<BestEffortQueryGenerator>(
-            TermCategory::Cpc | TermCategory::Title | TermCategory::Abstract | TermCategory::Claims));
+            TermCategory::Cpc | TermCategory::Title | TermCategory::Abstract | TermCategory::Claims,
+            maxXorGroups));
 
     out.emplace_back(
         std::make_unique<OptimizingQueryGenerator>(
-            TermCategory::Cpc | TermCategory::Title | TermCategory::Abstract | TermCategory::Claims));
+            TermCategory::Cpc | TermCategory::Title | TermCategory::Abstract | TermCategory::Claims,
+            20,
+            maxXorGroups));
+
+    out.emplace_back(
+        std::make_unique<OptimizingQueryGenerator>(
+            TermCategory::Cpc | TermCategory::Title | TermCategory::Abstract | TermCategory::Claims,
+            10,
+            0));
 
     for (auto categories : std::vector<TermCategory::TermCategory>{
              TermCategory::Cpc,
@@ -908,7 +940,7 @@ inline std::vector<std::unique_ptr<QueryGenerator>> createQueryGenerators() {
              TermCategory::Title | TermCategory::Abstract,
              TermCategory::Cpc | TermCategory::Title | TermCategory::Abstract,
          }) {
-        out.emplace_back(std::make_unique<FPGrowthQueryGenerator>(categories, 2, 2, 2));
+        out.emplace_back(std::make_unique<FPGrowthQueryGenerator>(categories, 2, 2, 2, maxXorGroups));
     }
 
     for (auto category : std::vector<TermCategory::TermCategory>{

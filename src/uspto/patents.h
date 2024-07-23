@@ -58,36 +58,6 @@ public:
         return out;
     }
 
-    std::uint16_t readTermCount(const std::string& publicationNumber, const Term& term) {
-        seekToKey(publicationNumber);
-
-        auto cpcSize = readScalar<std::uint32_t>();
-        auto titleSize = readScalar<std::uint32_t>();
-        auto abstractSize = readScalar<std::uint32_t>();
-        auto claimsSize = readScalar<std::uint32_t>();
-
-        auto cpcOffset = getPosition();
-        auto titleOffset = cpcOffset + cpcSize;
-        auto abstractOffset = titleOffset + titleSize;
-        auto claimsOffset = abstractOffset + abstractSize;
-        auto descriptionOffset = claimsOffset + claimsSize;
-
-        switch (term.category) {
-            case TermCategory::Cpc:
-                return readKeywordCount(term.token, cpcOffset);
-            case TermCategory::Title:
-                return readTextCount(term.token, titleOffset);
-            case TermCategory::Abstract:
-                return readTextCount(term.token, abstractOffset);
-            case TermCategory::Claims:
-                return readTextCount(term.token, claimsOffset);
-            case TermCategory::Description:
-                return readTextCount(term.token, descriptionOffset);
-        }
-
-        __builtin_unreachable();
-    }
-
     ankerl::unordered_dense::map<std::string, std::uint16_t> readTermsWithCounts(
         const std::string& publicationNumber,
         TermCategory::TermCategory categories) {
@@ -129,27 +99,6 @@ public:
         return out;
     }
 
-    std::uint32_t readTotalTermCount(const std::string& publicationNumber) {
-        seekToKey(publicationNumber);
-
-        auto cpcSize = readScalar<std::uint32_t>();
-        auto titleSize = readScalar<std::uint32_t>();
-        auto abstractSize = readScalar<std::uint32_t>();
-        auto claimsSize = readScalar<std::uint32_t>();
-
-        auto cpcOffset = getPosition();
-        auto titleOffset = cpcOffset + cpcSize;
-        auto abstractOffset = titleOffset + titleSize;
-        auto claimsOffset = abstractOffset + abstractSize;
-        auto descriptionOffset = claimsOffset + claimsSize;
-
-        return readTotalKeywordTokenCount(cpcOffset)
-               + readTotalTextTokenCount(titleOffset)
-               + readTotalTextTokenCount(abstractOffset)
-               + readTotalTextTokenCount(claimsOffset)
-               + readTotalTextTokenCount(descriptionOffset);
-    }
-
 private:
     void readKeywordTokens(std::vector<std::string>& out, std::uint64_t offset, TermCategory::TermCategory category) {
         auto prefix = TermCategory::toString(category) + ":";
@@ -158,9 +107,19 @@ private:
         auto noTokens = readScalar<std::uint16_t>();
         out.reserve(out.size() + noTokens);
 
+        ankerl::unordered_dense::set<std::string> wildcardTokens;
+
         for (std::uint16_t i = 0; i < noTokens; ++i) {
-            out.emplace_back(prefix + readString<std::uint8_t>());
+            auto term = prefix + readString<std::uint8_t>();
+            out.emplace_back(term);
+
+            auto slashIndex = term.find('/');
+            if (slashIndex != std::string::npos) {
+                wildcardTokens.insert(term.substr(0, slashIndex) + "/*");
+            }
         }
+
+        out.insert(out.end(), wildcardTokens.begin(), wildcardTokens.end());
     }
 
     void readTextTokens(std::vector<std::string>& out, std::uint64_t offset, TermCategory::TermCategory category) {
@@ -176,41 +135,6 @@ private:
         }
     }
 
-    std::uint16_t readKeywordCount(const std::string& token, std::uint64_t offset) {
-        seek(offset);
-
-        auto noTokens = readScalar<std::uint16_t>();
-        auto tokenLength = token.length();
-
-        for (std::uint16_t i = 0; i < noTokens; ++i) {
-            auto currentToken = readString<std::uint8_t>();
-
-            if (currentToken.length() == tokenLength && currentToken == token) {
-                return 1;
-            }
-        }
-
-        return 0;
-    }
-
-    std::uint16_t readTextCount(const std::string& token, std::uint64_t offset) {
-        seek(offset);
-
-        auto noTokens = readScalar<std::uint32_t>();
-        auto tokenLength = token.length();
-
-        for (std::uint32_t i = 0; i < noTokens; ++i) {
-            auto currentToken = readString<std::uint16_t>();
-            auto count = readScalar<std::uint16_t>();
-
-            if (currentToken.length() == tokenLength && currentToken == token) {
-                return count;
-            }
-        }
-
-        return 0;
-    }
-
     void readKeywordTokensWithCounts(
         ankerl::unordered_dense::map<std::string, std::uint16_t>& out,
         std::uint64_t offset,
@@ -222,9 +146,13 @@ private:
         out.reserve(out.size() + noTokens);
 
         for (std::uint16_t i = 0; i < noTokens; ++i) {
-            auto token = readString<std::uint8_t>();
+            auto term = prefix + readString<std::uint8_t>();
+            out.emplace(term, 1);
 
-            out.emplace(prefix + token, 1);
+            auto slashIndex = term.find('/');
+            if (slashIndex != std::string::npos) {
+                ++out[term.substr(0, slashIndex) + "/*"];
+            }
         }
     }
 
@@ -244,24 +172,6 @@ private:
 
             out.emplace(prefix + token, count);
         }
-    }
-
-    std::uint32_t readTotalKeywordTokenCount(std::uint64_t offset) {
-        seek(offset);
-        return readScalar<std::uint16_t>();
-    }
-
-    std::uint32_t readTotalTextTokenCount(std::uint64_t offset) {
-        std::uint32_t total = 0;
-        seek(offset);
-
-        auto noTokens = readScalar<std::uint32_t>();
-        for (std::uint32_t i = 0; i < noTokens; ++i) {
-            readString<std::uint16_t>();
-            total += readScalar<std::uint16_t>();
-        }
-
-        return total;
     }
 };
 

@@ -912,7 +912,7 @@ private:
 inline std::vector<std::unique_ptr<QueryGenerator>> createQueryGenerators() {
     std::vector<std::unique_ptr<QueryGenerator>> out;
 
-    int maxXorGroups = 7;
+    int maxXorGroups = 5;
 
     out.emplace_back(
         std::make_unique<BestEffortQueryGenerator>(

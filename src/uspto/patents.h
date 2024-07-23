@@ -107,19 +107,19 @@ private:
         auto noTokens = readScalar<std::uint16_t>();
         out.reserve(out.size() + noTokens);
 
-        ankerl::unordered_dense::set<std::string> wildcardTokens;
+        // ankerl::unordered_dense::set<std::string> wildcardTokens;
 
         for (std::uint16_t i = 0; i < noTokens; ++i) {
             auto term = prefix + readString<std::uint8_t>();
             out.emplace_back(term);
 
-            auto slashIndex = term.find('/');
+            /*auto slashIndex = term.find('/');
             if (slashIndex != std::string::npos) {
                 wildcardTokens.insert(term.substr(0, slashIndex) + "/*");
-            }
+            }*/
         }
 
-        out.insert(out.end(), wildcardTokens.begin(), wildcardTokens.end());
+        // out.insert(out.end(), wildcardTokens.begin(), wildcardTokens.end());
     }
 
     void readTextTokens(std::vector<std::string>& out, std::uint64_t offset, TermCategory::TermCategory category) {
@@ -149,10 +149,10 @@ private:
             auto term = prefix + readString<std::uint8_t>();
             out.emplace(term, 1);
 
-            auto slashIndex = term.find('/');
+            /*auto slashIndex = term.find('/');
             if (slashIndex != std::string::npos) {
                 ++out[term.substr(0, slashIndex) + "/*"];
-            }
+            }*/
         }
     }
 

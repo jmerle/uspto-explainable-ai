@@ -1,13 +1,14 @@
 # USPTO Explainable AI
 
-This repository contains my code for the [USPTO - Explainable AI for Patent Professionals](https://www.kaggle.com/competitions/uspto-explainable-ai/overview) competition on Kaggle.
+This repository contains my code for the [USPTO - Explainable AI for Patent Professionals](https://www.kaggle.com/competitions/uspto-explainable-ai/overview) competition on Kaggle in which I finished in the 13th place.
 
 Kaggle links:
-- Offline notebook (competition submission): [USPTO Explainable AI - Ensemble](https://www.kaggle.com/code/jmerle/uspto-explainable-ai-ensemble)
-- Online notebook (dependencies): [USPTO Explainable AI - Ensemble dependencies](https://www.kaggle.com/code/jmerle/uspto-explainable-ai-ensemble-dependencies)
-- Reformatted competition data dataset: [USPTO Explainable AI - Reformatted Patent Data](https://www.kaggle.com/datasets/jmerle/uspto-explainable-ai-reformatted-patent-data)
-- Full search index dataset: [USPTO Explainable AI - Full Search Index](https://www.kaggle.com/datasets/jmerle/uspto-explainable-ai-full-search-index)
-- Original submission notebook (before switching to C++): [USPTO Explainable AI](https://www.kaggle.com/code/jmerle/uspto-explainable-ai)
+- Write-up: [kaggle.com/competitions/uspto-explainable-ai/discussion/522359](https://www.kaggle.com/competitions/uspto-explainable-ai/discussion/522359)
+- Offline notebook (competition submission): [kaggle.com/code/jmerle/uspto-explainable-ai-ensemble](https://www.kaggle.com/code/jmerle/uspto-explainable-ai-ensemble)
+- Online notebook (dependencies): [kaggle.com/code/jmerle/uspto-explainable-ai-ensemble-dependencies](https://www.kaggle.com/code/jmerle/uspto-explainable-ai-ensemble-dependencies)
+- Reformatted competition data dataset: [kaggle.com/datasets/jmerle/uspto-explainable-ai-reformatted-patent-data](https://www.kaggle.com/datasets/jmerle/uspto-explainable-ai-reformatted-patent-data)
+- Full search index dataset: [kaggle.com/datasets/jmerle/uspto-explainable-ai-full-search-index](https://www.kaggle.com/datasets/jmerle/uspto-explainable-ai-full-search-index)
+- Original submission notebook (before switching to C++): [kaggle.com/code/jmerle/uspto-explainable-ai](https://www.kaggle.com/code/jmerle/uspto-explainable-ai)
 
 I started out in Python, and managed to get a public score of 0.53 using basic frequent pattern mining as seen in the [`python/original-submission.ipynb`](./python/original-submission.ipynb) notebook.
 
